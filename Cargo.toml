@@ -1,0 +1,9 @@
+[package]
+name = "ddive"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bollard = "0.18.1"
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4.0", features = ["cargo","derive"] }
