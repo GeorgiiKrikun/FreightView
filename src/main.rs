@@ -2,7 +2,7 @@ use bollard::{secret::ImageSummary, Docker};
 use bollard::image::ListImagesOptions;
 use clap::builder::Str;
 use std::default::Default;
-use std::path::PathBuf;
+use std::path::{self, Path, PathBuf};
 use clap::{command,Arg};
 // use std::default::Default;
 use std::fs::{File, FileType};
@@ -63,14 +63,16 @@ struct TreeNode {
     kids: Vec<TreeNode>,
     ftype: DDiveFileType,
     fop: FileOp,
+    path: PathBuf,
 }
 
 impl TreeNode {
-    fn new(ftype : &DDiveFileType, fop: &FileOp) -> TreeNode {
+    fn new(ftype : &DDiveFileType, fop: &FileOp, path: &PathBuf) -> TreeNode {
         TreeNode {
             kids: Vec::new(),
             ftype: ftype.clone(),
             fop: fop.clone(),
+            path: path.clone(),
         }
     }
 
@@ -78,21 +80,41 @@ impl TreeNode {
         self.kids.push(child);
         self.kids.last_mut().unwrap()
     }
+
+    fn print_tree(&self, depth: usize) {
+        let mut indent = String::new();
+        for _ in 0..depth {
+            indent.push_str("  ");
+        }
+        let ftype_str = match &self.ftype {
+            DDiveFileType::Directory => "Directory",
+            DDiveFileType::File => "File",
+            DDiveFileType::Symlink => "Symlink",
+        };
+        let fop_str = match &self.fop {
+            FileOp::Add => "Add",
+            FileOp::Remove => "Remove",
+        };
+        let path_str = self.path.to_str().unwrap();
+        println!("{}{}<{}>: {}", indent, ftype_str, path_str, fop_str);
+        for kid in &self.kids {
+            kid.print_tree(depth + 1);
+        }
+    }
 }
 
-const PATH_BLACKLIST : [&str; 1] = ["var/run"];
+const PATH_BLACKLIST : [&str; 2] = ["var/run", "run"];
 fn is_blacklisted(path: &str) -> bool {
     PATH_BLACKLIST.contains(&path)
 }
 
 // Parse directory into tree
 fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut TreeNode) {
-    let rel_path = path.strip_prefix(main_path).unwrap();
+    let rel_path = PathBuf::from(path.strip_prefix(main_path).unwrap());
     if is_blacklisted(rel_path.to_str().unwrap()) {
         println!("Entered blacklisted path: {}", rel_path.display());
         return;
     }
-    println!("Parsing directory: {}", rel_path.display());
     let metadata = std::fs::metadata(&path);
     if metadata.is_err() {
         println!("Error reading metadata for path: {}", &path.display());
@@ -101,7 +123,7 @@ fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut T
     let metadata = metadata.unwrap();
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
-    let mut node = TreeNode::new(&ftype, &FileOp::Add);
+    let mut node = TreeNode::new(&ftype, &FileOp::Add, &rel_path);
     let node = parent.add_child(node);
 
     match &ftype {
@@ -194,7 +216,7 @@ async fn main() {
     let layer_folder = img_folder.join("blobs").join("sha256");
     println!("Layer folder: {}", layer_folder.display());
 
-    let layer_trees: Vec<(String,TreeNode)> = Vec::new();
+    let mut layer_trees: Vec<(String,TreeNode)> = Vec::new();
 
     // Unpack layers
     for layer  in &layers {
@@ -212,8 +234,14 @@ async fn main() {
         // stupid crap but idk how to do it yet
 
         let main_dir = layer_dir.clone();
-        let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add);
-        let layer_tree = parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
+        let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
+        parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
+        layer_trees.push((layer_spec.to_string(), layer_tree));
+    }
+
+    for (layer_spec, layer_tree) in layer_trees {
+        println!("Layer: {}", layer_spec);
+        layer_tree.print_tree(0);
     }
 
     // Walk through the image
