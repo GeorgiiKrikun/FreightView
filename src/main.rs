@@ -1,10 +1,11 @@
 use bollard::{secret::ImageSummary, Docker};
 use bollard::image::ListImagesOptions;
+use clap::builder::Str;
 use std::default::Default;
 use std::path::PathBuf;
 use clap::{command,Arg};
 // use std::default::Default;
-use std::fs::File;
+use std::fs::{File, FileType};
 use std::io::Write;
 use flate2::read::GzDecoder;
 use tar::Archive;
@@ -30,6 +31,110 @@ async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<ImageSu
     image
 }
 
+#[derive(Clone)]
+enum DDiveFileType {
+    Directory,
+    File,
+    Symlink
+}
+
+impl DDiveFileType {
+    fn from_ftype(ftype: FileType) -> DDiveFileType {
+        if ftype.is_dir() {
+            DDiveFileType::Directory
+        } else if ftype.is_file() {
+            DDiveFileType::File
+        } else if ftype.is_symlink() {
+            DDiveFileType::Symlink
+        } else {
+            panic!("Unknown file type");
+        }
+    }
+}
+
+// File operations type
+#[derive(Clone)]
+enum FileOp {
+    Add,
+    Remove
+}
+
+struct TreeNode {
+    kids: Vec<TreeNode>,
+    ftype: DDiveFileType,
+    fop: FileOp,
+}
+
+impl TreeNode {
+    fn new(ftype : &DDiveFileType, fop: &FileOp) -> TreeNode {
+        TreeNode {
+            kids: Vec::new(),
+            ftype: ftype.clone(),
+            fop: fop.clone(),
+        }
+    }
+
+    fn add_child(&mut self, child: TreeNode) -> &mut TreeNode {
+        self.kids.push(child);
+        self.kids.last_mut().unwrap()
+    }
+}
+
+const PATH_BLACKLIST : [&str; 1] = ["var/run"];
+fn is_blacklisted(path: &str) -> bool {
+    PATH_BLACKLIST.contains(&path)
+}
+
+// Parse directory into tree
+fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut TreeNode) {
+    let rel_path = path.strip_prefix(main_path).unwrap();
+    if is_blacklisted(rel_path.to_str().unwrap()) {
+        println!("Entered blacklisted path: {}", rel_path.display());
+        return;
+    }
+    println!("Parsing directory: {}", rel_path.display());
+    let metadata = std::fs::metadata(&path);
+    if metadata.is_err() {
+        println!("Error reading metadata for path: {}", &path.display());
+        return;
+    }
+    let metadata = metadata.unwrap();
+
+    let ftype = DDiveFileType::from_ftype(metadata.file_type());
+    let mut node = TreeNode::new(&ftype, &FileOp::Add);
+    let node = parent.add_child(node);
+
+    match &ftype {
+        &DDiveFileType::Directory => {
+            let entries = std::fs::read_dir(&path);
+            match entries {
+                Ok(entries) => {
+                    for entry in entries {
+                        match entry {
+                            Ok(pentry) => {
+                                let entry_path = pentry.path();
+                                parse_directory_into_tree(main_path, entry_path, node);
+                            }
+                            Err(e) => {
+                                println!("Erroroneous dir entry: {}", e);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!("Error reading directory {}: {}", &path.display(), e);
+                    return;
+                }
+            }
+        }
+        &DDiveFileType::File => {
+            // Do nothing
+        }
+        &DDiveFileType::Symlink => {
+            // Do nothing
+        }
+    }
+}
 
 
 #[tokio::main]
@@ -89,27 +194,40 @@ async fn main() {
     let layer_folder = img_folder.join("blobs").join("sha256");
     println!("Layer folder: {}", layer_folder.display());
 
+    let layer_trees: Vec<(String,TreeNode)> = Vec::new();
 
     // Unpack layers
-    for layer  in layers {
+    for layer  in &layers {
         let layer_spec = &layer[7..];
-        let layer_path = format!("image/blobs/sha256/{}", layer_spec);
+        let layer_tar_path = layer_folder.join(layer_spec);
+        let layer_dir_name = String::from(layer_spec) + ".dir";
+        let layer_dir = layer_folder.join(&layer_dir_name);
         
-        let layer_tar = File::open(layer_path).expect("Can't open layer");
-        let out_layer_path = format!("image/blobs/sha256/{}.dir/", layer_spec);
+        let layer_tar = File::open(&layer_tar_path).expect("Can't open layer");
 
-        println!("Unpacking layer: {} to {}", layer, out_layer_path);
+        println!("Unpacking layer: {} to {}", layer, layer_dir.display());
         let mut layer_archive = Archive::new(layer_tar);
-        layer_archive.unpack(out_layer_path).expect("Can't unpack layer");       
+        layer_archive.unpack(&layer_dir).expect("Can't unpack layer");       
+
+        // stupid crap but idk how to do it yet
+
+        let main_dir = layer_dir.clone();
+        let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add);
+        let layer_tree = parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
     }
 
     // Walk through the image
+    
+    
+    // for layer in &layers {
+    //     let layer_spec = &layer[7..];
+    //     let layer_dir_name = String::from(layer_spec) + ".dir";
+    //     let layer_dir = layer_folder.join(&layer_dir_name);
+        
+        
+    // }
 
     
-    for entry in WalkDir::new("image") {
-        let entry = entry.expect("Can't get entry");
-        println!("{}", entry.path().display());
-    }
 
 
     
