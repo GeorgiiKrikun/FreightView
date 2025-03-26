@@ -7,3 +7,7 @@ edition = "2024"
 bollard = "0.18.1"
 tokio = { version = "1", features = ["full"] }
 clap = { version = "4.0", features = ["cargo","derive"] }
+flate2 = "*"
+tar = "*"
+futures-core = "*"
+futures-util = "*"

@@ -1,1 +1,16 @@
 /target
+/image
+debug.log
+
+*.tar
+
+# If you're using an IDE or editor, you might want to ignore their settings
+# For example, VS Code:
+.vscode/
+
+# MacOS-specific files
+.DS_Store
+
+# Windows-specific files
+Thumbs.db
+Cargo.lock
