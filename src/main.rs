@@ -2,7 +2,7 @@ mod docker_file_tree;
 mod docker_image_utils;
 
 use docker_file_tree::{DDiveFileType, FileOp, TreeNode, parse_directory_into_tree};
-use docker_image_utils::{download_image_file, unpack_image_layers};
+use docker_image_utils::{download_image_file, unpack_image_layers,  ImageRepr};
 use bollard::Docker;
 use std::error::Error;
 use std::path::PathBuf;
@@ -26,28 +26,11 @@ async fn main() -> Result<(), Box<dyn Error> >{
     .arg(Arg::new("Name"))
     .get_matches();
 
-    let img_name : &String = matches.get_one::<String>("Name").expect("Can't parse to string");
-    println!("Image name: {}", img_name);
+    let img_name : String = matches.get_one::<String>("Name").expect("Can't parse to string").clone();
 
     let docker = Docker::connect_with_socket_defaults().expect("Can't connect to docker");
 
-    let binding = TempDir::new().expect("Failed to create temporary directory");
-    let temp_dir = binding.path();
-    let img_tar_file_path = PathBuf::from(temp_dir).join("image.tar");
-    let img_folder = PathBuf::from(temp_dir).join("image");
-    println!("Image tar file: {}", img_tar_file_path.display());
-
-    let layers = download_image_file(&docker, img_name, &img_tar_file_path).await;
-
-    // Untar image
-    let file = File::open(&img_tar_file_path).expect("Can't open file");
-    let mut archive = Archive::new(file);
-    archive.unpack(&img_folder).expect("Can't unpack image");
-
-    let layer_folder = img_folder.join("blobs").join("sha256");
-    println!("Layer folder: {}", layer_folder.display());
-
-    let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &layers);
+    let img = ImageRepr::new(img_name, &docker).await;
 
     let home = home_dir().expect("Can't get home directory");
     let ddive_cache_path = home.join(".ddive");
@@ -56,7 +39,7 @@ async fn main() -> Result<(), Box<dyn Error> >{
         std::fs::create_dir(&ddive_cache_path).expect("Can't create ddive cache directory");
     }
 
-    for (layer_spec, layer_tree) in layer_trees {
+    for (layer_spec, layer_tree) in &img.layers {
         println!("Layer: {}", layer_spec);
         let layer_json = serde_json::to_string(&layer_tree).expect("Can't serialize layer tree");
         let layer_cache_path = ddive_cache_path.join(&layer_spec).with_extension("json");

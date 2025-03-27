@@ -1,14 +1,44 @@
 use bollard::{secret::ImageSummary, Docker, image::ListImagesOptions};
 use futures_util::StreamExt;
 use futures_core::task::Poll;
+use tempfile::TempDir;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use tar::Archive;
 use crate::docker_file_tree::{TreeNode, DDiveFileType, FileOp, parse_directory_into_tree};
 
-struct ImageRepresentation {
-    
+pub struct ImageRepr {
+    name : String,
+    temp_dir : TempDir,
+    pub layers : Vec<(String,TreeNode)>,
+}
+
+impl ImageRepr {
+    pub async fn new(name: String, docker: &Docker) -> ImageRepr {
+        let temp_dir = TempDir::new().expect("Failed to create temporary directory");
+        let img_tar_file_path = PathBuf::from(temp_dir.path()).join("image.tar");
+        let img_folder = PathBuf::from(temp_dir.path()).join("image");
+        let layers = download_image_file(&docker, &name, &img_tar_file_path).await;
+
+        // Untar image
+        let file: File = File::open(&img_tar_file_path).expect("Can't open file");
+        let mut archive = Archive::new(file);
+        archive.unpack(&img_folder).expect("Can't unpack image");
+
+        let layer_folder = img_folder.join("blobs").join("sha256");
+
+        let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &layers);
+
+
+        ImageRepr {
+            name: name,
+            temp_dir: temp_dir,
+            layers: layer_trees,
+        }
+    }
+
+
 }
 
 pub async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<ImageSummary> {
