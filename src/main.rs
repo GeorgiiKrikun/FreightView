@@ -2,7 +2,7 @@ mod docker_file_tree;
 mod docker_image_utils;
 
 use docker_file_tree::{DDiveFileType, FileOp, TreeNode, parse_directory_into_tree};
-use docker_image_utils::{download_image_file};
+use docker_image_utils::{download_image_file, unpack_image_layers};
 use bollard::Docker;
 use std::error::Error;
 use std::path::PathBuf;
@@ -47,28 +47,7 @@ async fn main() -> Result<(), Box<dyn Error> >{
     let layer_folder = img_folder.join("blobs").join("sha256");
     println!("Layer folder: {}", layer_folder.display());
 
-    let mut layer_trees: Vec<(String,TreeNode)> = Vec::new();
-
-    // Unpack layers
-    for layer  in &layers {
-        let layer_spec = &layer[7..];
-        let layer_tar_path = layer_folder.join(layer_spec);
-        let layer_dir_name = String::from(layer_spec) + ".dir";
-        let layer_dir = layer_folder.join(&layer_dir_name);
-        
-        let layer_tar = File::open(&layer_tar_path).expect("Can't open layer");
-
-        println!("Unpacking layer: {} to {}", layer, layer_dir.display());
-        let mut layer_archive = Archive::new(layer_tar);
-        layer_archive.unpack(&layer_dir).expect("Can't unpack layer");       
-
-        // stupid crap but idk how to do it yet
-
-        let main_dir = layer_dir.clone();
-        let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
-        parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
-        layer_trees.push((layer_spec.to_string(), layer_tree));
-    }
+    let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &layers);
 
     let home = home_dir().expect("Can't get home directory");
     let ddive_cache_path = home.join(".ddive");
