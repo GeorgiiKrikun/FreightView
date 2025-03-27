@@ -1,17 +1,95 @@
 use bollard::{secret::ImageSummary, Docker, image::ListImagesOptions};
 use futures_util::StreamExt;
 use futures_core::task::Poll;
+use home::home_dir;
 use tempfile::TempDir;
-use std::fs::File;
+use std::mem::swap;
+use std::{fs::File, path::Path};
 use std::io::Write;
 use std::path::PathBuf;
 use tar::Archive;
 use crate::docker_file_tree::{TreeNode, DDiveFileType, FileOp, parse_directory_into_tree};
 
+pub struct ImageLayer {
+    name: String,
+    tree: TreeNode,
+    repr: Option<ImageRepr>
+}
+
+impl ImageLayer {
+    pub fn new(name: String, tree: TreeNode) -> ImageLayer {
+        ImageLayer {
+            name: name,
+            tree: tree,
+            repr: None,
+        }
+    }
+
+    fn get_cache_dir() -> PathBuf {
+        let home = home_dir().expect("Can't get home directory");
+        let ddive_cache_path = home.join(".ddive");
+        if !ddive_cache_path.exists() {
+            std::fs::create_dir(&ddive_cache_path).expect("Can't create ddive cache directory");
+        }
+        ddive_cache_path
+    }
+
+    fn get_layer_path_wstr(layer : &str) -> PathBuf {
+        ImageLayer::get_cache_dir().join(layer).with_extension("json")
+    }
+
+    fn get_layer_path(&self) -> PathBuf {
+        ImageLayer::get_layer_path_wstr(&self.name)
+    }
+
+    pub fn save(&self) {
+        let layer_cache_path = self.get_layer_path();
+        let mut layer_cache_file = File::create(&layer_cache_path).expect("Can't create layer cache file");
+        let layer_json = serde_json::to_string(&self.tree).expect("Can't serialize layer tree");
+        layer_cache_file.write_all(layer_json.as_bytes()).expect("Can't write to layer cache file");        
+    }
+
+    pub fn load(layer : &str) -> Result<ImageLayer, Box<dyn std::error::Error> > {
+        let layer_cache_path = ImageLayer::get_layer_path_wstr(layer);
+        let layer_cache_file = File::open(&layer_cache_path)?;
+        let layer_tree : TreeNode = serde_json::from_reader(layer_cache_file)?;
+        Ok(ImageLayer::new(layer.to_string(), layer_tree))
+    }
+
+    pub fn check_cache(layer : &str ) -> bool {
+        ImageLayer::get_layer_path_wstr(layer).exists()
+    }
+
+    pub fn filter_cached_layers(layers : &mut Vec<String>) -> Vec<ImageLayer> {
+        let mut remaining_layers: Vec<String> = Vec::new();
+        let mut cached_layers: Vec<String> = Vec::new();
+        let mut out_layers : Vec<ImageLayer> = Vec::new();
+        for layer  in &mut *layers {
+            if ImageLayer::check_cache(layer) {
+                println!("Layer {} is cached", layer);
+                cached_layers.push(layer.clone());
+            } else {
+                println!("Layer {} is not cached", layer);
+                remaining_layers.push(layer.clone());
+            }
+        }
+
+        for layer in cached_layers {
+            let layer = ImageLayer::load(&layer).expect("Can't load layer");
+            out_layers.push(layer);
+        }
+
+        swap(layers, &mut remaining_layers);
+
+        out_layers
+
+    }
+}
+
 pub struct ImageRepr {
     name : String,
     temp_dir : TempDir,
-    pub layers : Vec<(String,TreeNode)>,
+    pub layers : Vec<ImageLayer>,
 }
 
 impl ImageRepr {
@@ -19,7 +97,7 @@ impl ImageRepr {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let img_tar_file_path = PathBuf::from(temp_dir.path()).join("image.tar");
         let img_folder = PathBuf::from(temp_dir.path()).join("image");
-        let layers = download_image_file(&docker, &name, &img_tar_file_path).await;
+        let layers : Vec<String> = download_image_file(&docker, &name, &img_tar_file_path).await;
 
         // Untar image
         let file: File = File::open(&img_tar_file_path).expect("Can't open file");
@@ -28,13 +106,32 @@ impl ImageRepr {
 
         let layer_folder = img_folder.join("blobs").join("sha256");
 
-        let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &layers);
+        // split layers into cached and non-cached
+        let mut non_cached_layers = layers.clone();
 
+        // Get cached layers
+        let _ = ImageLayer::filter_cached_layers(&mut non_cached_layers);
 
+        // get non-cached layers
+        let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &non_cached_layers);
+
+        // Construct cache from non-cached layers
+        for (layer_name, layer_tree) in layer_trees {
+            let layer = ImageLayer::new(layer_name, layer_tree);
+            layer.save();
+        }
+
+        // Finally, load all layers from cache
+        let mut all_layers : Vec<ImageLayer> = Vec::new();
+        for layer in layers {
+            let layer = ImageLayer::load(&layer).expect("Can't load layer");
+            all_layers.push(layer);
+        }
+        
         ImageRepr {
             name: name,
             temp_dir: temp_dir,
-            layers: layer_trees,
+            layers: all_layers,
         }
     }
 
@@ -96,7 +193,7 @@ pub fn unpack_image_layers(layer_folder: &PathBuf, layers: &Vec<String> ) -> Vec
     for layer  in layers {
         let layer_spec = &layer[7..];
         let layer_tar_path = layer_folder.join(layer_spec);
-        let layer_dir_name = String::from(layer_spec) + ".dir";
+        let layer_dir_name = String::from(layer) + ".dir";
         let layer_dir = layer_folder.join(&layer_dir_name);
         
         let layer_tar = File::open(&layer_tar_path).expect("Can't open layer");
@@ -110,7 +207,7 @@ pub fn unpack_image_layers(layer_folder: &PathBuf, layers: &Vec<String> ) -> Vec
         let main_dir = layer_dir.clone();
         let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
         parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
-        layer_trees.push((layer_spec.to_string(), layer_tree));
+        layer_trees.push((layer.to_string(), layer_tree));
     }
 
     layer_trees

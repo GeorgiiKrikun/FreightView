@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::fs::FileType;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone,Serialize)]
+#[derive(Clone,Serialize,Deserialize)]
 pub enum DDiveFileType {
     Directory,
     File,
@@ -24,13 +24,13 @@ impl DDiveFileType {
 }
 
 // File operations type
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum FileOp {
     Add,
     Remove
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TreeNode {
     path: PathBuf,
     ftype: DDiveFileType,
