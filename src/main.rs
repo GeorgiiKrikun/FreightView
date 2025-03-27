@@ -2,6 +2,7 @@ use bollard::{secret::ImageSummary, Docker};
 use bollard::image::ListImagesOptions;
 use clap::builder::Str;
 use std::default::Default;
+use std::error::Error;
 use std::path::{self, Path, PathBuf};
 use clap::{command,Arg};
 // use std::default::Default;
@@ -13,6 +14,9 @@ use futures_util::StreamExt;
 use futures_core::task::Poll;
 use walkdir::WalkDir;
 use tempfile::TempDir;
+use serde::Serialize;
+use serde_json;
+use home::home_dir;
 
 async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<ImageSummary> {
     let images = &docker.list_images(Some(ListImagesOptions::<String> {
@@ -31,7 +35,7 @@ async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<ImageSu
     image
 }
 
-#[derive(Clone)]
+#[derive(Clone,Serialize)]
 enum DDiveFileType {
     Directory,
     File,
@@ -53,26 +57,27 @@ impl DDiveFileType {
 }
 
 // File operations type
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 enum FileOp {
     Add,
     Remove
 }
 
+#[derive(Serialize)]
 struct TreeNode {
-    kids: Vec<TreeNode>,
+    path: PathBuf,
     ftype: DDiveFileType,
     fop: FileOp,
-    path: PathBuf,
+    kids: Vec<TreeNode>,
 }
 
 impl TreeNode {
     fn new(ftype : &DDiveFileType, fop: &FileOp, path: &PathBuf) -> TreeNode {
         TreeNode {
-            kids: Vec::new(),
+            path: path.clone(),
             ftype: ftype.clone(),
             fop: fop.clone(),
-            path: path.clone(),
+            kids: Vec::new(),
         }
     }
 
@@ -160,7 +165,7 @@ fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut T
 
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error> >{
     // let args = Args::parse();
     let matches = command!() // requires `cargo` feature
     .arg(Arg::new("Name"))
@@ -239,10 +244,22 @@ async fn main() {
         layer_trees.push((layer_spec.to_string(), layer_tree));
     }
 
+    let home = home_dir().expect("Can't get home directory");
+    let ddive_cache_path = home.join(".ddive");
+    // ensure ddive cache path exists
+    if !ddive_cache_path.exists() {
+        std::fs::create_dir(&ddive_cache_path).expect("Can't create ddive cache directory");
+    }
+
     for (layer_spec, layer_tree) in layer_trees {
         println!("Layer: {}", layer_spec);
-        layer_tree.print_tree(0);
+        let layer_json = serde_json::to_string(&layer_tree).expect("Can't serialize layer tree");
+        let layer_cache_path = ddive_cache_path.join(&layer_spec).with_extension("json");
+        let mut layer_cache_file = File::create(&layer_cache_path).expect("Can't create layer cache file");
+        layer_cache_file.write_all(layer_json.as_bytes()).expect("Can't write to layer cache file");
     }
+
+    Ok(())
 
     // Walk through the image
     
