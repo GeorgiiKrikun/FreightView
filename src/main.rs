@@ -24,6 +24,11 @@ async fn main() -> Result<(), Box<dyn Error> >{
 
     let img = ImageRepr::new(img_name, &docker).await;
 
+    for layer in &img.layers {
+        println!("--------------------------Layer: {}-----------------------------", layer.name);
+        layer.tree.print_tree(0);
+    }
+
     Ok(())
 
     // Walk through the image

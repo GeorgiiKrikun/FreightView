@@ -11,9 +11,8 @@ use tar::Archive;
 use crate::docker_file_tree::{TreeNode, DDiveFileType, FileOp, parse_directory_into_tree};
 
 pub struct ImageLayer {
-    name: String,
-    tree: TreeNode,
-    repr: Option<ImageRepr>
+    pub name: String,
+    pub tree: TreeNode,
 }
 
 impl ImageLayer {
@@ -21,7 +20,6 @@ impl ImageLayer {
         ImageLayer {
             name: name,
             tree: tree,
-            repr: None,
         }
     }
 
