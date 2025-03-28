@@ -17,6 +17,8 @@ struct App {
     layer_names: Vec<String>,
     exit: bool,
     list_state: ListState,
+    tree_state: TreeState<&'static str>,
+    list_selected: bool,
 }
 
 impl App {
@@ -24,50 +26,67 @@ impl App {
         let layers_names : Vec<String> = item.layers.iter().map(|layer| layer.name.clone()).collect();
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        App { item : item, selected_layer: 0, layer_names : layers_names, exit: false, list_state: list_state }
+        let tree_state: TreeState<&str> = TreeState::default();
+        App { item : item, selected_layer: 0, layer_names : layers_names, exit: false, list_state: list_state, 
+        tree_state: tree_state, list_selected: true}
     }
 
-    fn next(&mut self) {
+    fn next_list(&mut self) {
         if self.selected_layer < self.layer_names.len() - 1 {
             self.selected_layer += 1;
             self.list_state.select(Some(self.selected_layer));
         }
     }
 
-    fn previous(&mut self) {
+    fn next_tree(&mut self) {
+        self.tree_state.select_relative(|current| {
+            current.map_or(0, |current| current.saturating_add(1))
+        });
+    }
+
+    fn next(&mut self) {
+        if self.list_selected {
+            self.next_list();
+        } else {
+            self.next_tree();
+        }
+    }
+
+    fn previous_list(&mut self) {
         if self.selected_layer > 0 {
             self.selected_layer -= 1;
             self.list_state.select(Some(self.selected_layer));
         }
     }
 
+    fn previous_tree(&mut self) {
+        self.tree_state.select_relative(|current| {
+            current.map_or(0, |current| current.saturating_sub(1))
+        });
+    }
+
+    fn previous(&mut self) {
+        if self.list_selected {
+            self.previous_list();
+        } else {
+            self.previous_tree();
+        }
+    }
+
+    fn expand_tree(&mut self) {
+        self.tree_state.toggle_selected();
+    }
+
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
+            terminal.draw(|frame| self.render(frame))?;
             self.handle_events()?;
         }
         Ok(())
     }
 
-    fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    fn handle_events(&mut self) -> io::Result<()> {
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Down => self.next(), // Move selection down
-                KeyCode::Up => self.previous(), // Move selection up
-                KeyCode::Char('q') => self.exit = true, // Quit
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    fn render(& mut self, frame: &mut Frame) {
+        let area  = frame.area();
         let hlayout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -80,8 +99,14 @@ impl Widget for &App {
             .collect();
 
 
+        let (list_title, tree_title) = if self.list_selected {
+            (">>> Layers <<<", "Filesystem tree view")
+        } else {
+            ("Layers", ">>> Filesystem tree view <<<")
+        };
+
         let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Select an Item"))
+        .block(Block::default().borders(Borders::ALL).title(list_title))
         .highlight_style(
             Style::default()
                 .bg(Color::Blue)
@@ -90,17 +115,48 @@ impl Widget for &App {
         )
         .highlight_symbol(">> ");
 
-        StatefulWidget::render(list, hlayout[0], buf, &mut self.list_state.clone());
-        let a = TreeItem::new_leaf("l", "Leaf");
+        frame.render_stateful_widget(list, hlayout[0], &mut self.list_state);
+        let a = TreeItem::new_leaf("l", "Leaf1");
         let b = TreeItem::new("r", "Root", vec![a]).expect("WHAT");
-        let items = vec![b];
+        let c = TreeItem::new_leaf("l", "Leaf2");
+        let d = TreeItem::new_leaf("heh", "Leaf3");
+        let items = vec![b,c,d];
 
-        let tree_widget = Tree::new(&items).expect("WTF");
-        let mut tree_state : TreeState<&str> = TreeState::default();
+        if self.tree_state.selected().len() == 0 {
+            self.tree_state.select_first();
+        }
 
-        StatefulWidget::render(tree_widget, hlayout[1], buf, &mut tree_state);
+        let tree_widget = Tree::new(&items).expect("WTF")
+        .block(Block::default().borders(Borders::ALL).title(tree_title))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+
+        frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
 
 
+    }
+
+    // fn draw(&self, frame: &mut Frame) {
+    //     frame.render_widget(self, frame.area());
+    // }
+
+    fn handle_events(&mut self) -> io::Result<()> {
+        if let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Down => self.next(), // Move selection down
+                KeyCode::Up => self.previous(), // Move selection up
+                KeyCode::Tab => self.list_selected = !self.list_selected, // Switch between list and tree
+                KeyCode::Char(' ') => self.expand_tree(), // Expand tree
+                KeyCode::Char('q') => self.exit = true, // Quit
+                _ => {}
+            }
+        }
+        Ok(())
     }
 }
 
