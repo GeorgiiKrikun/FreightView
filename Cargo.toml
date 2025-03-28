@@ -16,3 +16,6 @@ tempfile = "*"
 serde = { version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 home = "*"
+ratatui = "0.29.0"
+crossterm = "0.28.1"
+tui-tree-widget = "*"
