@@ -1,6 +1,6 @@
 mod docker_file_tree;
 mod docker_image_utils;
-use docker_image_utils::ImageRepr;
+use docker_image_utils::{ImageLayer, ImageRepr};
 use bollard::Docker;
 use std::error::Error;
 use clap::{command,Arg};
@@ -14,7 +14,6 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 struct App {
     item: ImageRepr,
     selected_layer: usize,
-    layer_names: Vec<String>,
     exit: bool,
     list_state: ListState,
     tree_state: TreeState<&'static str>,
@@ -23,16 +22,19 @@ struct App {
 
 impl App {
     fn new(item: ImageRepr) -> App {
-        let layers_names : Vec<String> = item.layers.iter().map(|layer| layer.name.clone()).collect();
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         let tree_state: TreeState<&str> = TreeState::default();
-        App { item : item, selected_layer: 0, layer_names : layers_names, exit: false, list_state: list_state, 
+        App { item : item, selected_layer: 0, exit: false, list_state: list_state, 
         tree_state: tree_state, list_selected: true}
     }
 
+    fn layer_names(&self) -> Vec<String> {
+        self.item.layers.iter().map(|layer| layer.name.clone()).collect()
+    }
+
     fn next_list(&mut self) {
-        if self.selected_layer < self.layer_names.len() - 1 {
+        if self.selected_layer < self.layer_names().len() - 1 {
             self.selected_layer += 1;
             self.list_state.select(Some(self.selected_layer));
         }
@@ -93,7 +95,7 @@ impl App {
             .split(area);
 
         let items: Vec<ListItem> = self
-            .layer_names
+            .layer_names()
             .iter()
             .map(|i| ListItem::new(Span::from(i.clone())))
             .collect();
