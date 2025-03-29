@@ -194,9 +194,9 @@ impl App<'_> {
 
 
         let (list_title, tree_title) = if self.list_selected {
-            (">>> Layers <<<", "Filesystem tree view")
+            ("😍 Layers ", "Filesystem tree view")
         } else {
-            ("Layers", ">>> Filesystem tree view <<<")
+            ("Layers", "😍 Filesystem tree view ")
         };
 
         let list = List::new(items)
