@@ -94,7 +94,9 @@ impl ImageLayer {
 }
 
 pub struct ImageRepr {
+    #[allow(dead_code)]
     name : String,
+    #[allow(dead_code)]
     temp_dir : TempDir,
     pub layers : Vec<ImageLayer>,
 }
@@ -145,6 +147,7 @@ impl ImageRepr {
 
 }
 
+#[allow(dead_code)]
 pub async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<ImageSummary> {
     let images = &docker.list_images(Some(ListImagesOptions::<String> {
         all: true,

@@ -115,6 +115,7 @@ impl TreeNode {
         self.kids.last_mut().unwrap()
     }
 
+    #[allow(dead_code)]
     pub fn print_tree(&self, depth: usize) {
         let mut indent = String::new();
         for _ in 0..depth {

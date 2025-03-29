@@ -17,7 +17,6 @@ use clap::{
 };
 use std::io;
 use ratatui::{
-    backend::CrosstermBackend, 
     layout::{
         Constraint, 
         Direction, 
@@ -51,22 +50,20 @@ use tui_tree_widget::{
     TreeState
 };
 
-struct App<'a> {
+struct App {
     item: ImageRepr,
     selected_layer: usize,
     exit: bool,
     list_state: ListState,
     tree_state: TreeState<String>,
     list_selected: bool,
-    tree_vec : Vec<Option<Tree<'a, String> > >,
 }
 
-impl App<'_> {
-    fn new(item: ImageRepr) -> App<'static> {
+impl App {
+    fn new(item: ImageRepr) -> App {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         let tree_state: TreeState<String> = TreeState::default();
-        let tree_vec : Vec<Option<Tree<String> > > = Vec::new();
         App { 
             item, 
             selected_layer: 0, 
@@ -74,7 +71,6 @@ impl App<'_> {
             list_state, 
             tree_state, 
             list_selected: true, 
-            tree_vec
         }
     }
 
@@ -258,7 +254,6 @@ impl App<'_> {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        const POLL_TIME : Duration  =  Duration::from_millis(0);
         let key_events = App::get_all_key_events();
         for key_event in key_events {
             match key_event.code {
@@ -287,14 +282,12 @@ async fn main() -> Result<(), Box<dyn Error> >{
 
     let img = ImageRepr::new(img_name, &docker).await;
     
-    let stdout = io::stdout();
-    let backend = CrosstermBackend::new(stdout);
     let mut terminal = ratatui::init();
 
     
 
     let mut app = App::new(img);
-    let res = app.run(&mut terminal);
+    let _ = app.run(&mut terminal);
 
     ratatui::restore();
 
