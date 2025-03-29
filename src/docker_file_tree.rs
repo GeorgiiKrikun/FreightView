@@ -139,18 +139,9 @@ impl TreeNode {
     }
 }
 
-const PATH_BLACKLIST : [&str; 2] = ["var/run", "run"];
-fn is_blacklisted(path: &str) -> bool {
-    PATH_BLACKLIST.contains(&path)
-}
-
 // Parse directory into tree
 pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut TreeNode) {
     let rel_path = PathBuf::from(path.strip_prefix(main_path).unwrap());
-    if is_blacklisted(rel_path.to_str().unwrap()) {
-        println!("Entered blacklisted path: {}", rel_path.display());
-        return;
-    }
     let metadata = std::fs::metadata(&path);
     if metadata.is_err() {
         println!("Error reading metadata for path: {}", &path.display());
