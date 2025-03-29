@@ -4,7 +4,7 @@ use futures_core::task::Poll;
 use home::home_dir;
 use tempfile::TempDir;
 use std::mem::swap;
-use std::{fs::File, path::Path};
+use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use tar::Archive;

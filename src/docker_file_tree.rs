@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 pub enum DDiveFileType {
     Directory,
     File,
-    Symlink
+    Symlink,
+    Badfile
 }
 
 impl DDiveFileType {
@@ -18,7 +19,7 @@ impl DDiveFileType {
         } else if ftype.is_symlink() {
             DDiveFileType::Symlink
         } else {
-            panic!("Unknown file type");
+           DDiveFileType::Badfile
         }
     }
 }
@@ -74,14 +75,17 @@ impl TreeNode {
         &self.path
     }
 
+    #[allow(dead_code)]
     pub fn ftype(&self) -> &DDiveFileType {
         &self.ftype
     }
-
+    
+    #[allow(dead_code)]
     pub fn fop(&self) -> &FileOp {
         &self.fop
     }
 
+    #[allow(dead_code)]
     pub fn is_leaf(&self) -> bool {
         self.kids.is_empty()
     }
@@ -114,6 +118,7 @@ impl TreeNode {
             DDiveFileType::Directory => "Directory",
             DDiveFileType::File => "File",
             DDiveFileType::Symlink => "Symlink",
+            DDiveFileType::Badfile => "Badfile",
         };
         let fop_str = match &self.fop {
             FileOp::Add => "Add",
@@ -179,5 +184,8 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
         &DDiveFileType::Symlink => {
             // Do nothing
         }
+        &DDiveFileType::Badfile => {
+            // Do nothing
+        }   
     }
 }
