@@ -6,9 +6,9 @@ use crate::docker_image_utils::{
 use std::{
     collections::HashMap, 
     time::Duration, 
-    vec
 };
 use std::io;
+use ratatui::widgets::Paragraph;
 use ratatui::{
     layout::{
         Constraint, 
@@ -44,6 +44,11 @@ use tui_tree_widget::{
     TreeState
 };
 
+enum Focus {
+    List,
+    Tree,
+    SearchBar,
+}
 
 pub struct App {
     item: ImageRepr,
@@ -51,7 +56,8 @@ pub struct App {
     exit: bool,
     list_state: ListState,
     tree_state: TreeState<String>,
-    list_selected: bool,
+    focus: Focus,
+    search_bar_content: String,
 }
 
 impl App {
@@ -65,7 +71,8 @@ impl App {
             exit: false, 
             list_state, 
             tree_state, 
-            list_selected: true, 
+            focus: Focus::List,
+            search_bar_content: "test search".to_string(),
         }
     }
 
@@ -140,11 +147,19 @@ impl App {
         });
     }
 
+    fn circle_focus(&mut self) {
+        match self.focus {
+            Focus::List => self.focus = Focus::Tree,
+            Focus::Tree => self.focus = Focus::List,
+            Focus::SearchBar => {}
+        }
+    }
+
     fn next(&mut self) {
-        if self.list_selected {
-            self.next_list();
-        } else {
-            self.next_tree();
+        match self.focus {
+            Focus::List => self.next_list(),
+            Focus::Tree => self.next_tree(),
+            Focus::SearchBar => {}
         }
     }
 
@@ -162,10 +177,10 @@ impl App {
     }
 
     fn previous(&mut self) {
-        if self.list_selected {
-            self.previous_list();
-        } else {
-            self.previous_tree();
+        match self.focus {
+            Focus::List => self.previous_list(),
+            Focus::Tree => self.previous_tree(),
+            Focus::SearchBar => {}
         }
     }
 
@@ -183,10 +198,15 @@ impl App {
 
     fn render(& mut self, frame: &mut Frame) {
         let area  = frame.area();
+        let vlayout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref())
+            .split(area);
+
         let hlayout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(area);
+            .split(vlayout[0]);
 
         let items: Vec<ListItem> = self
             .layer_names()
@@ -194,11 +214,14 @@ impl App {
             .map(|i| ListItem::new(Span::from(i.clone())))
             .collect();
 
+        let list_title = match self.focus {
+            Focus::List => "😍 Layers ",
+            _ => "Layers",
+        };
 
-        let (list_title, tree_title) = if self.list_selected {
-            ("😍 Layers ", "Filesystem tree view")
-        } else {
-            ("Layers", "😍 Filesystem tree view ")
+        let tree_title = match self.focus {
+            Focus::Tree => "😍 Tree",
+            _ => "Tree",
         };
 
         let list = List::new(items)
@@ -212,11 +235,6 @@ impl App {
         .highlight_symbol(">> ");
 
         frame.render_stateful_widget(list, hlayout[0], &mut self.list_state);
-        // let a = TreeItem::new_leaf("l", "Leaf1");
-        // let b = TreeItem::new("r", "Root", vec![a]).expect("WHAT");
-        // let c = TreeItem::new_leaf("l", "Leaf2");
-        // let d = TreeItem::new_leaf("heh", "Leaf3");
-        // let items = vec![b,c,d];
         let current_layer = &self.item.layers[self.selected_layer];
         let items = App::construct_items(current_layer);
 
@@ -236,7 +254,12 @@ impl App {
 
         frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
 
+        let search = Paragraph::new(self.search_bar_content.clone())
+            .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Search"));
 
+        frame.render_widget(search, vlayout[1]);
     }
 
     fn get_all_key_events() -> Vec<KeyEvent> {
@@ -265,7 +288,7 @@ impl App {
             match key_event.code {
                 KeyCode::Down => self.next(), // Move selection down
                 KeyCode::Up => self.previous(), // Move selection up
-                KeyCode::Tab => self.list_selected = !self.list_selected, // Switch between list and tree
+                KeyCode::Tab => self.circle_focus(), // Switch between list and tree
                 KeyCode::Char(' ') => self.expand_tree(), // Expand tree
                 KeyCode::Char('q') => self.exit = true, // Quit
                 _ => {}
