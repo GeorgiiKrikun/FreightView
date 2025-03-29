@@ -106,12 +106,33 @@ impl ImageRepr {
         let temp_dir = TempDir::new().expect("Failed to create temporary directory");
         let img_tar_file_path = PathBuf::from(temp_dir.path()).join("image.tar");
         let img_folder = PathBuf::from(temp_dir.path()).join("image");
-        let layers : Vec<String> = download_image_file(&docker, &name, &img_tar_file_path).await;
+
+        let layers = get_image_layers(&docker, &name).await;
+        let all_layers_cached: bool = layers.iter().all(|layer| ImageLayer::check_cache(layer));
+
+        if all_layers_cached {
+            let mut all_layers : Vec<ImageLayer> = Vec::new();
+            for layer in layers {
+                let layer = ImageLayer::load(&layer).expect("Can't load cached layer");
+                all_layers.push(layer);
+            }
+            return ImageRepr {
+                name: name,
+                temp_dir: temp_dir,
+                layers: all_layers,
+            }
+        }
+
+        println!("Missing some layers in the cache, need to redownload the image");
+
+        download_image_file(&docker, &name, &img_tar_file_path).await;
 
         // Untar image
         let file: File = File::open(&img_tar_file_path).expect("Can't open file");
         let mut archive = Archive::new(file);
         archive.unpack(&img_folder).expect("Can't unpack image");
+
+        println!("Finished downloading the image, unpacking layers");
 
         let layer_folder = img_folder.join("blobs").join("sha256");
 
@@ -165,10 +186,14 @@ pub async fn get_image_summary(docker: &Docker, img_name: &String) -> Option<Ima
     image
 }
 
-pub async fn download_image_file(docker: &Docker, img_name: &String, img_tar_file_path : &PathBuf) -> Vec<String> {
+pub async fn get_image_layers(docker: &Docker, img_name: &String) -> Vec<String> {
     let image_details = docker.inspect_image(img_name).await.unwrap();
     let rfs = image_details.root_fs.expect("No fs");
     let layers = rfs.layers.expect("No layers in the image");
+    layers
+}
+
+pub async fn download_image_file(docker: &Docker, img_name: &String, img_tar_file_path : &PathBuf) {
     let mut stream = docker.export_image(img_name);
     let mut context = std::task::Context::from_waker(futures_util::task::noop_waker_ref());
     let mut file = File::create(&img_tar_file_path).expect("Can't create file");
@@ -193,8 +218,6 @@ pub async fn download_image_file(docker: &Docker, img_name: &String, img_tar_fil
             }
         }
     }
-
-    layers
    
 }
 
