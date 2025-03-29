@@ -1,16 +1,55 @@
 mod docker_file_tree;
 mod docker_image_utils;
 use docker_file_tree::TreeNode;
-use docker_image_utils::{ImageLayer, ImageRepr};
+use docker_image_utils::{
+    ImageLayer, 
+    ImageRepr
+};
 use bollard::Docker;
-use std::{collections::HashMap, error::Error, time::Duration, vec};
-use clap::{command,Arg};
+use std::{
+    collections::HashMap, 
+    error::Error, 
+    time::Duration, 
+    vec
+};
+use clap::{
+    command,Arg
+};
 use std::io;
 use ratatui::{
-    backend::CrosstermBackend, layout::{self, Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::Span, widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget, Widget}, DefaultTerminal, Frame, Terminal
+    backend::CrosstermBackend, 
+    layout::{
+        Constraint, 
+        Direction, 
+        Layout
+    }, 
+    style::{
+        Color, 
+        Modifier, 
+        Style
+    }, 
+    text::Span, 
+    widgets::{
+        Block, 
+        Borders, 
+        List, 
+        ListItem, 
+        ListState, 
+    }, 
+    DefaultTerminal, 
+    Frame
 };
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
-use tui_tree_widget::{Tree, TreeItem, TreeState};
+use crossterm::event::{
+    self, 
+    Event, 
+    KeyCode, 
+    KeyEvent
+};
+use tui_tree_widget::{
+    Tree, 
+    TreeItem, 
+    TreeState
+};
 
 struct App<'a> {
     item: ImageRepr,

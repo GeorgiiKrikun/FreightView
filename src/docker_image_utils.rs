@@ -1,4 +1,8 @@
-use bollard::{secret::ImageSummary, Docker, image::ListImagesOptions};
+use bollard::{
+    secret::ImageSummary, 
+    Docker, 
+    image::ListImagesOptions
+};
 use futures_util::StreamExt;
 use futures_core::task::Poll;
 use home::home_dir;
@@ -8,7 +12,12 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use tar::Archive;
-use crate::docker_file_tree::{TreeNode, DDiveFileType, FileOp, parse_directory_into_tree};
+use crate::docker_file_tree::{
+    TreeNode, 
+    DDiveFileType, 
+    FileOp, 
+    parse_directory_into_tree
+};
 
 pub struct ImageLayer {
     pub name: String,
@@ -162,7 +171,8 @@ pub async fn download_image_file(docker: &Docker, img_name: &String, img_tar_fil
     let mut file = File::create(&img_tar_file_path).expect("Can't create file");
 
 
-    while let poll_res = stream.poll_next_unpin(&mut context) {
+    loop { 
+        let poll_res = stream.poll_next_unpin(&mut context); 
         match poll_res {
             Poll::Ready(option) => {
                 match option {
@@ -205,7 +215,7 @@ pub fn unpack_image_layers(layer_folder: &PathBuf, layers: &Vec<String> ) -> Vec
         let main_dir = layer_dir.clone();
         let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
         parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
-        let mut layer_tree = layer_tree.prettyfy();
+        let layer_tree = layer_tree.prettyfy();
         // Change root of the tree to the first child
         layer_trees.push((layer.to_string(), layer_tree));
     }

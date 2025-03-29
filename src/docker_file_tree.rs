@@ -1,6 +1,12 @@
-use std::{collections::VecDeque, path::PathBuf};
+use std::{
+    collections::VecDeque, 
+    path::PathBuf
+};
 use std::fs::FileType;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, 
+    Serialize
+};
 
 #[derive(Clone,Serialize,Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
@@ -79,7 +85,7 @@ impl TreeNode {
     pub fn ftype(&self) -> &DDiveFileType {
         &self.ftype
     }
-    
+
     #[allow(dead_code)]
     pub fn fop(&self) -> &FileOp {
         &self.fop
@@ -152,7 +158,7 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
     let metadata = metadata.unwrap();
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
-    let mut node = TreeNode::new(&ftype, &FileOp::Add, &rel_path);
+    let node = TreeNode::new(&ftype, &FileOp::Add, &rel_path);
     let node = parent.add_child(node);
 
     match &ftype {
