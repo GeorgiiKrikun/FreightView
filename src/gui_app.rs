@@ -72,7 +72,7 @@ impl App {
             list_state, 
             tree_state, 
             focus: Focus::List,
-            search_bar_content: "test search".to_string(),
+            search_bar_content: "".to_string(),
         }
     }
 
@@ -128,16 +128,11 @@ impl App {
 
         // All that should be left in the map are the nodes below the root
 
-        // let subroot_items_refs : Vec<&&TreeNode> = map.keys().collect();
-        let huy : Vec<TreeItem<String> > = map.into_values().collect();
+        let keys : Vec<TreeItem<String> > = map.into_values().collect();
         // sort by name
-        let mut huy = huy;
-        huy.sort_by(|a, b| a.identifier().cmp(b.identifier()));
-        huy
-
-
-
-
+        let mut keys = keys;
+        keys.sort_by(|a, b| a.identifier().cmp(b.identifier()));
+        keys
     }
 
 
@@ -224,6 +219,11 @@ impl App {
             _ => "Tree",
         };
 
+        let search_title = match self.focus {
+            Focus::SearchBar => "😍 Search",
+            _ => "Search",
+        };
+
         let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title(list_title))
         .highlight_style(
@@ -245,7 +245,7 @@ impl App {
         let tree_widget = Tree::new(&items).expect("WTF")
         .block(Block::default().borders(Borders::ALL).title(tree_title))
         .highlight_style(
-            Style::default()
+                Style::default()
                 .bg(Color::Blue)
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
@@ -257,7 +257,7 @@ impl App {
         let search = Paragraph::new(self.search_bar_content.clone())
             .block(Block::default()
             .borders(Borders::ALL)
-            .title("Search"));
+            .title(search_title));
 
         frame.render_widget(search, vlayout[1]);
     }
@@ -285,14 +285,34 @@ impl App {
     fn handle_events(&mut self) -> io::Result<()> {
         let key_events = App::get_all_key_events();
         for key_event in key_events {
-            match key_event.code {
-                KeyCode::Down => self.next(), // Move selection down
-                KeyCode::Up => self.previous(), // Move selection up
-                KeyCode::Tab => self.circle_focus(), // Switch between list and tree
-                KeyCode::Char(' ') => self.expand_tree(), // Expand tree
-                KeyCode::Char('q') => self.exit = true, // Quit
-                _ => {}
+            match self.focus {
+                Focus::SearchBar => {
+                    match key_event.code {
+                        KeyCode::Char(c) => {
+                            self.search_bar_content.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            self.search_bar_content.pop();
+                        }
+                        KeyCode::Enter => {
+                            self.focus = Focus::Tree;
+                        }
+                        _ => {}
+                    }
+                },
+                _ => {
+                    match key_event.code {
+                        KeyCode::Down => self.next(), // Move selection down
+                        KeyCode::Up => self.previous(), // Move selection up
+                        KeyCode::Tab => self.circle_focus(), // Switch between list and tree
+                        KeyCode::Char(' ') => self.expand_tree(), // Expand tree
+                        KeyCode::Char('q') => self.exit = true, // Quit
+                        KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => self.focus = Focus::SearchBar,
+                    _ => {}
+                }
             }
+            }
+            
         }
         Ok(())
     }
