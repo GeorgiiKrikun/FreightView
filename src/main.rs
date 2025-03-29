@@ -3,13 +3,13 @@ mod docker_image_utils;
 use docker_file_tree::TreeNode;
 use docker_image_utils::{ImageLayer, ImageRepr};
 use bollard::Docker;
-use std::{collections::HashMap, error::Error, vec};
+use std::{collections::{HashMap, VecDeque}, error::Error, time::Duration, vec};
 use clap::{command,Arg};
 use std::io;
 use ratatui::{
     backend::CrosstermBackend, buffer::Buffer, layout::{self, Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::Span, widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget, Widget}, DefaultTerminal, Frame, Terminal
 };
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 struct App<'a> {
@@ -19,7 +19,7 @@ struct App<'a> {
     list_state: ListState,
     tree_state: TreeState<String>,
     list_selected: bool,
-    tree_vec : Vec<Option<Tree<'a, String> > >
+    tree_vec : Vec<Option<Tree<'a, String> > >,
 }
 
 impl App<'_> {
@@ -198,13 +198,31 @@ impl App<'_> {
 
     }
 
-    // fn draw(&self, frame: &mut Frame) {
-    //     frame.render_widget(self, frame.area());
-    // }
+    fn get_all_key_events() -> Vec<KeyEvent> {
+        let mut key_events = Vec::new();
+        loop {
+            let event = event::poll(Duration::from_millis(0));
+            if event.is_err() {
+                break;
+            }
+            let event = event.unwrap();
+            if ! event {
+                break;
+            } else {
+                let event = event::read().expect("Can't read key event");
+                if let Event::Key(key_event) = event {
+                    key_events.push(key_event);
+                }
+            }
+        }
+        key_events
+    }
 
     fn handle_events(&mut self) -> io::Result<()> {
-        if let Event::Key(key) = event::read()? {
-            match key.code {
+        const POLL_TIME : Duration  =  Duration::from_millis(0);
+        let key_events = App::get_all_key_events();
+        for key_event in key_events {
+            match key_event.code {
                 KeyCode::Down => self.next(), // Move selection down
                 KeyCode::Up => self.previous(), // Move selection up
                 KeyCode::Tab => self.list_selected = !self.list_selected, // Switch between list and tree
