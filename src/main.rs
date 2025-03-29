@@ -57,10 +57,21 @@ impl App<'_> {
         let mut map: HashMap<&TreeNode, TreeItem<String> > = HashMap::new();
 
         for &node in nodes_vec.iter().rev() {
-            let name : String = node.path().to_str().expect("I can't convert to string").to_string();
+            let try_name  = node.path().file_name();
+            let mut name : String = "root".to_string();
+            match try_name {
+                Some(try_name) => {
+                    name = try_name.to_str().expect("WTF").to_string();
+                },
+                None => {
+                }
+            }
+                    
+            let path = String::from(node.path().to_str().expect("WTF"));
+            // let name  = String::from(node.path().file_name().expect("WTF").to_str().expect("WTF"));
 
             if node.kids().len() == 0 {
-                let leaf = TreeItem::new_leaf(name.clone(), name.clone());
+                let leaf = TreeItem::new_leaf(path.clone(), name.clone());
                 map.insert(node, leaf);
             } else {               
                 let kids = node.kids();
@@ -70,7 +81,7 @@ impl App<'_> {
                     let kid_item : TreeItem<String> = map.remove(kid).expect("Can't find child in map");
                     kids_items.push(kid_item);
                 }
-                let tree_item = TreeItem::new(name.clone(), name.clone(), kids_items).expect("Can't create tree item");
+                let tree_item = TreeItem::new(path.clone(), name.clone(), kids_items).expect("Can't create tree item");
                 map.insert(node, tree_item);
             }
         }
@@ -81,21 +92,6 @@ impl App<'_> {
 
     }
 
-    // fn get_layer_tree(&mut self, layer : &str) -> Tree<&str>{
-    //     let layer_ids = self.layer_names();
-    //     let layer_id = layer_ids.iter().position(|x| x == layer).unwrap();
-
-    //     let layer = &self.item.layers[layer_id];
-    //     let tree = self.tree_vec[layer_id];
-    //     match tree {
-    //         Some(t) => t,
-    //         None => {
-    //             let tree = Tree::new(&layer.tree).expect("Can't create tree");
-    //             self.tree_vec[layer_id] = Some(tree);
-    //             tree
-    //         }
-    //     }
-    // }
 
     fn next_tree(&mut self) {
         self.tree_state.select_relative(|current| {

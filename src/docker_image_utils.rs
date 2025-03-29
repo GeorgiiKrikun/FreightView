@@ -205,6 +205,8 @@ pub fn unpack_image_layers(layer_folder: &PathBuf, layers: &Vec<String> ) -> Vec
         let main_dir = layer_dir.clone();
         let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
         parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
+        let mut layer_tree = layer_tree.prettyfy();
+        // Change root of the tree to the first child
         layer_trees.push((layer.to_string(), layer_tree));
     }
 

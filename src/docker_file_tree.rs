@@ -56,6 +56,20 @@ impl TreeNode {
         vec
     }
 
+    pub fn prettyfy(mut self) -> TreeNode {
+        if self.kids.len() == 1 {
+            let mut kid = self.kids.remove(0);
+            if kid.path == PathBuf::from("") {
+                kid.path = PathBuf::from("/");
+            }
+            return kid;
+        } else {
+            println!("Prettyfying node with {} children is not feasible", self.kids.len());
+            return self;
+        }
+
+    }
+
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
