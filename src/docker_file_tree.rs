@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{collections::VecDeque, path::PathBuf};
 use std::fs::FileType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
     Directory,
     File,
@@ -24,13 +24,13 @@ impl DDiveFileType {
 }
 
 // File operations type
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum FileOp {
     Add,
     Remove
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct TreeNode {
     path: PathBuf,
     ftype: DDiveFileType,
@@ -46,6 +46,44 @@ impl TreeNode {
             fop: fop.clone(),
             kids: Vec::new(),
         }
+    }
+
+    pub fn kids(&self) -> Vec<&TreeNode> {
+        let mut vec : Vec<&TreeNode> = Vec::new();
+        for kid in &self.kids {
+            vec.push(kid);
+        }
+        vec
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn ftype(&self) -> &DDiveFileType {
+        &self.ftype
+    }
+
+    pub fn fop(&self) -> &FileOp {
+        &self.fop
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.kids.is_empty()
+    }
+
+    pub fn breadth_first(&self) -> Vec<&TreeNode> {
+        let mut nodes : Vec<&TreeNode> = Vec::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(self);
+        while !queue.is_empty() {
+            let node = queue.pop_front().unwrap();
+            nodes.push(node);
+            for kid in node.kids() {
+                queue.push_back(kid);
+            }
+        }
+        nodes
     }
 
     pub fn add_child(&mut self, child: TreeNode) -> &mut TreeNode {

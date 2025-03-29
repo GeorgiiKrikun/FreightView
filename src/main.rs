@@ -1,8 +1,9 @@
 mod docker_file_tree;
 mod docker_image_utils;
+use docker_file_tree::TreeNode;
 use docker_image_utils::{ImageLayer, ImageRepr};
 use bollard::Docker;
-use std::error::Error;
+use std::{collections::HashMap, error::Error, vec};
 use clap::{command,Arg};
 use std::io;
 use ratatui::{
@@ -11,22 +12,31 @@ use ratatui::{
 use crossterm::event::{self, Event, KeyCode};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-struct App {
+struct App<'a> {
     item: ImageRepr,
     selected_layer: usize,
     exit: bool,
     list_state: ListState,
-    tree_state: TreeState<&'static str>,
+    tree_state: TreeState<String>,
     list_selected: bool,
+    tree_vec : Vec<Option<Tree<'a, String> > >
 }
 
-impl App {
-    fn new(item: ImageRepr) -> App {
+impl App<'_> {
+    fn new(item: ImageRepr) -> App<'static> {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        let tree_state: TreeState<&str> = TreeState::default();
-        App { item : item, selected_layer: 0, exit: false, list_state: list_state, 
-        tree_state: tree_state, list_selected: true}
+        let tree_state: TreeState<String> = TreeState::default();
+        let tree_vec : Vec<Option<Tree<String> > > = Vec::new();
+        App { 
+            item, 
+            selected_layer: 0, 
+            exit: false, 
+            list_state, 
+            tree_state, 
+            list_selected: true, 
+            tree_vec
+        }
     }
 
     fn layer_names(&self) -> Vec<String> {
@@ -39,6 +49,53 @@ impl App {
             self.list_state.select(Some(self.selected_layer));
         }
     }
+
+    fn construct_items(layer : &ImageLayer) -> Vec<TreeItem<String> > {
+        let tree = &layer.tree;
+        // parents at the start, children at the end
+        let nodes_vec : Vec<&TreeNode> = tree.breadth_first();
+        let mut map: HashMap<&TreeNode, TreeItem<String> > = HashMap::new();
+
+        for &node in nodes_vec.iter().rev() {
+            let name : String = node.path().to_str().expect("I can't convert to string").to_string();
+
+            if node.kids().len() == 0 {
+                let leaf = TreeItem::new_leaf(name.clone(), name.clone());
+                map.insert(node, leaf);
+            } else {               
+                let kids = node.kids();
+                // Because we are iterating in the reverse order of breadth-first search, we can assume that the children are already in the map
+                let mut kids_items : Vec<TreeItem<String> > = Vec::new();
+                for kid in kids {
+                    let kid_item : TreeItem<String> = map.remove(kid).expect("Can't find child in map");
+                    kids_items.push(kid_item);
+                }
+                let tree_item = TreeItem::new(name.clone(), name.clone(), kids_items).expect("Can't create tree item");
+                map.insert(node, tree_item);
+            }
+        }
+
+        // By this point,  the map should only include single top-level node
+        let item = map.remove(&tree).expect("Can't find top-level node in map");
+        vec![item]
+
+    }
+
+    // fn get_layer_tree(&mut self, layer : &str) -> Tree<&str>{
+    //     let layer_ids = self.layer_names();
+    //     let layer_id = layer_ids.iter().position(|x| x == layer).unwrap();
+
+    //     let layer = &self.item.layers[layer_id];
+    //     let tree = self.tree_vec[layer_id];
+    //     match tree {
+    //         Some(t) => t,
+    //         None => {
+    //             let tree = Tree::new(&layer.tree).expect("Can't create tree");
+    //             self.tree_vec[layer_id] = Some(tree);
+    //             tree
+    //         }
+    //     }
+    // }
 
     fn next_tree(&mut self) {
         self.tree_state.select_relative(|current| {
@@ -118,11 +175,13 @@ impl App {
         .highlight_symbol(">> ");
 
         frame.render_stateful_widget(list, hlayout[0], &mut self.list_state);
-        let a = TreeItem::new_leaf("l", "Leaf1");
-        let b = TreeItem::new("r", "Root", vec![a]).expect("WHAT");
-        let c = TreeItem::new_leaf("l", "Leaf2");
-        let d = TreeItem::new_leaf("heh", "Leaf3");
-        let items = vec![b,c,d];
+        // let a = TreeItem::new_leaf("l", "Leaf1");
+        // let b = TreeItem::new("r", "Root", vec![a]).expect("WHAT");
+        // let c = TreeItem::new_leaf("l", "Leaf2");
+        // let d = TreeItem::new_leaf("heh", "Leaf3");
+        // let items = vec![b,c,d];
+        let current_layer = &self.item.layers[self.selected_layer];
+        let items = App::construct_items(current_layer);
 
         if self.tree_state.selected().len() == 0 {
             self.tree_state.select_first();
