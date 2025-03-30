@@ -89,13 +89,16 @@ impl App {
 
     fn construct_items<'a>(layer : &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, String> > {
         let tree = &layer.tree;
+        let filtered_tree = tree.filter_tree_full_path(filter_str);
+
+        let tree = if let Some(filt_tree) = filtered_tree.as_ref() {
+            filt_tree // Reference to the filtered tree
+        } else {
+            &layer.tree // Reference to the original tree
+        };
+    
         // parents at the start, children at the end
         let nodes_vec : Vec<&TreeNode> = tree.breadth_first();
-        if (filter_str.starts_with("/")) {
-            let filter_str = &filter_str[1..];
-        }
-        // filter nodes that don't contain the filter string
-        let nodes_vec : Vec<&TreeNode> = nodes_vec.iter().filter(|node| node.path().to_str().expect("WTF").contains(filter_str)).map(|node| *node).collect();
 
         let mut map: HashMap<&TreeNode, TreeItem<String> > = HashMap::new();
 

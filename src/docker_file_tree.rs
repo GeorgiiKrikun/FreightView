@@ -149,18 +149,25 @@ impl TreeNode {
         let filter : Vec<&str> = filter.split("/").collect();
         // clean up empty strings
         let filter : Vec<&str> = filter.iter().filter(|&x| x != &"").map(|x| *x).collect();
+        if filter.len() == 0 {
+            return None;
+        }
         let mut out : TreeNode = self.clone();
         let mut current : &mut TreeNode = &mut out;
-        for d in (0..filter.len()) {
+        // last search string should be taken care separately as it should not filter when the path is not 
+        // yet fully typed
+        for d in (0..filter.len() - 1) {
             let subfilter : &str = filter[d];
             let mut next_ind : Option<usize> = None;
             let current_nkids = current.kids.len();
+
             for i in (0..current_nkids) {
                 if current.kids()[i].path().file_name().unwrap() == subfilter {
                     next_ind = Some(i);
                     break;
                 }
             }
+            
 
             match next_ind {
                 Some(n) => {
@@ -178,6 +185,28 @@ impl TreeNode {
                 }
             }
         }
+
+        // Parse the last string after / to filter the last node
+        let subfilter : &str = filter[filter.len() - 1];
+        let mut inds : Vec<usize> = Vec::new();
+        let current_nkids: usize = current.kids.len();
+        for i in (0..current_nkids) {
+            if current.kids()[i].path().file_name().unwrap().to_str().unwrap().starts_with(subfilter) {
+                inds.push(i);
+            }
+        }
+
+        if inds.len() == 0 {
+            return None;
+        }
+
+        let mut new_kids : Vec<TreeNode> = Vec::new();
+        for i in inds {
+            new_kids.push(current.kids[i].clone());
+        }
+
+        current.kids = new_kids;
+            
 
         Some(out)
         
@@ -306,5 +335,46 @@ mod tests {
                 assert!(true);
             }
         }
+    }
+
+    #[test]
+    fn filter_tree_not_full() {
+        let tree = construct_tree();
+        let filter = "/subtest/subsubte";
+        let filtered_tree = tree.filter_tree_full_path(filter);
+        let mut out = String::new();
+        filtered_tree.unwrap().print_tree(0, &mut out);
+        let out = out.split("\n").collect::<Vec<&str>>();
+        for line in &out {
+            println!("{}", line);
+        }
+
+        assert_eq!(out[0].trim(), "Directory</>: Add");
+        assert_eq!(out[1].trim(), "Directory</subtest>: Add");
+        assert_eq!(out[2].trim(), "Directory</subtest/subsubtest>: Add");
+        assert_eq!(out[3].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
+        assert_eq!(out[4].trim(), "Directory</subtest/subsubtest2>: Add");   
+    }
+
+    #[test]
+    fn filter_partial_start() {
+        let tree = construct_tree();
+        let filter = "/subte";
+        let filtered_tree = tree.filter_tree_full_path(filter);
+        let mut out = String::new();
+        filtered_tree.unwrap().print_tree(0, &mut out);
+        let out = out.split("\n").collect::<Vec<&str>>();
+
+        assert_eq!(out[0].trim(), "Directory</>: Add");
+        assert_eq!(out[1].trim(), "Directory</subtest>: Add");
+        assert_eq!(out[2].trim(), "File</subtest/subtestfile>: Add");
+        assert_eq!(out[3].trim(), "Directory</subtest/subsubtest>: Add");
+        assert_eq!(out[4].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
+        assert_eq!(out[5].trim(), "Directory</subtest/subsubtest2>: Add");  
+        assert_eq!(out[6].trim(), "Directory</subtest2>: Add");
+        assert_eq!(out[7].trim(), "File</subtest2/subfile2>: Add");
+        assert_eq!(out[8].trim(), "Directory</subtest2/subsubtest2>: Add");
+        assert_eq!(out[9].trim(), "File</subtest2/subsubtest2/subsubfile2>: Add");
+
     }
 }
