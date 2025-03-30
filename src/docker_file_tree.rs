@@ -38,7 +38,7 @@ pub enum FileOp {
     Remove
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
 pub struct TreeNode {
     path: PathBuf,
     ftype: DDiveFileType,
@@ -122,7 +122,7 @@ impl TreeNode {
     }
 
     #[allow(dead_code)]
-    pub fn print_tree(&self, depth: usize) {
+    pub fn print_tree(&self, depth: usize, output : &mut String) {
         let mut indent = String::new();
         for _ in 0..depth {
             indent.push_str("  ");
@@ -138,12 +138,51 @@ impl TreeNode {
             FileOp::Remove => "Remove",
         };
         let path_str = self.path.to_str().unwrap();
-        println!("{}{}<{}>: {}", indent, ftype_str, path_str, fop_str);
+        output.push_str(&format!("{}{}<{}>: {}\n", indent, ftype_str, path_str, fop_str));
+        // println!("{}{}<{}>: {}", indent, ftype_str, path_str, fop_str);
         for kid in &self.kids {
-            kid.print_tree(depth + 1);
+            kid.print_tree(depth + 1, output);
         }
     }
     
+    pub fn filter_tree_full_path(&self, filter: &str) -> Option<TreeNode> {
+        let filter : Vec<&str> = filter.split("/").collect();
+        // clean up empty strings
+        let filter : Vec<&str> = filter.iter().filter(|&x| x != &"").map(|x| *x).collect();
+        let mut out : TreeNode = self.clone();
+        let mut current : &mut TreeNode = &mut out;
+        for d in (0..filter.len()) {
+            let subfilter : &str = filter[d];
+            let mut next_ind : Option<usize> = None;
+            let current_nkids = current.kids.len();
+            for i in (0..current_nkids) {
+                if current.kids()[i].path().file_name().unwrap() == subfilter {
+                    next_ind = Some(i);
+                    break;
+                }
+            }
+
+            match next_ind {
+                Some(n) => {
+                    // extract filtered node
+                    let extracted = current.kids.swap_remove(n);
+                    // remove all other nodes
+                    current.kids.clear();
+                    // add filtered node
+                    current.kids.push(extracted);
+                    // move to next node
+                    current = current.kids.last_mut().unwrap();
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+
+        Some(out)
+        
+
+    }
 
 }
 
@@ -207,14 +246,65 @@ mod tests {
 
     use super::parse_directory_into_tree;
 
-    #[test]
-    fn test_parse_directory_into_tree() {
+    fn construct_tree() -> super::TreeNode {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let test_dir = project_dir.join("test-files");
         let mut parent = super::TreeNode::new(&super::DDiveFileType::Directory, &super::FileOp::Add, &PathBuf::from(""));
-
         parse_directory_into_tree(&test_dir, test_dir.clone(), &mut parent);
         let parent = parent.prettyfy();
-        parent.print_tree(0);
+        return parent;
+    }
+
+    #[test]
+    fn test_print_tree() {
+        let tree = construct_tree();
+        let mut out = String::new();
+        tree.print_tree(0, &mut out);
+        println!("{}", out);
+    }
+
+    #[test]
+    fn filter_tree_full_path() {
+        let tree = construct_tree();
+        let filter = "/subtest/subsubtest";
+        let filtered_tree = tree.filter_tree_full_path(filter);
+        let mut out = String::new();
+        filtered_tree.unwrap().print_tree(0, &mut out);
+        let out = out.split("\n").collect::<Vec<&str>>();
+        assert_eq!(out[0].trim(), "Directory</>: Add");
+        assert_eq!(out[1].trim(), "Directory</subtest>: Add");
+        assert_eq!(out[2].trim(), "Directory</subtest/subsubtest>: Add");
+        assert_eq!(out[3].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
+    }
+
+    #[test]
+    fn filter_tree_full_path_2() {
+        let tree = construct_tree();
+        let filter = "/subtest";
+        let filtered_tree = tree.filter_tree_full_path(filter);
+        let mut out = String::new();
+        filtered_tree.unwrap().print_tree(0,&mut out);
+        let out = out.split("\n").collect::<Vec<&str>>();
+        assert_eq!(out[0].trim(), "Directory</>: Add");
+        assert_eq!(out[1].trim(), "Directory</subtest>: Add");
+        assert_eq!(out[2].trim(), "File</subtest/subtestfile>: Add");
+        assert_eq!(out[3].trim(), "Directory</subtest/subsubtest>: Add");
+        assert_eq!(out[4].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
+        assert_eq!(out[5].trim(), "Directory</subtest/subsubtest2>: Add");   
+    }
+
+    #[test]
+    fn filter_tree_full_path_none() {
+        let tree = construct_tree();
+        let filter = "/subtest/subsasdubtest2";
+        let filtered_tree = tree.filter_tree_full_path(filter);
+        match filtered_tree {
+            Some(_) => {
+                assert!(false);
+            }
+            None => {
+                assert!(true);
+            }
+        }
     }
 }
