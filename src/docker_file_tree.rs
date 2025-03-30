@@ -77,8 +77,6 @@ impl TreeNode {
             out_node = self;
         }
 
-        
-
         out_node
 
     }
@@ -227,11 +225,23 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
     let mut node_path = rel_path.clone();
-    if ! node_path.starts_with("/") {
-        node_path = PathBuf::from("/").join(node_path);
-    }
+    let mut file_name = node_path.file_name().unwrap().to_str().unwrap();
+    let mut dir_name = String::from(node_path.parent().unwrap().to_str().unwrap());
     
-    let node = TreeNode::new(&ftype, &FileOp::Add, &node_path);
+    let op = if file_name.starts_with(".wh.") {
+        file_name = file_name.strip_prefix(".wh.").unwrap();
+        FileOp::Remove
+    } else {
+        FileOp::Add
+    };
+
+    if !dir_name.starts_with("/") {
+        dir_name = format!("/{}", dir_name);
+    }
+
+    let final_path = PathBuf::from(format!("{}{}", dir_name, file_name));
+    
+    let node = TreeNode::new(&ftype, &op, &final_path);
     let node = parent.add_child(node);
 
     match &ftype {
