@@ -87,10 +87,16 @@ impl App {
         }
     }
 
-    fn construct_items(layer : &ImageLayer) -> Vec<TreeItem<String> > {
+    fn construct_items<'a>(layer : &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, String> > {
         let tree = &layer.tree;
         // parents at the start, children at the end
         let nodes_vec : Vec<&TreeNode> = tree.breadth_first();
+        if (filter_str.starts_with("/")) {
+            let filter_str = &filter_str[1..];
+        }
+        // filter nodes that don't contain the filter string
+        let nodes_vec : Vec<&TreeNode> = nodes_vec.iter().filter(|node| node.path().to_str().expect("WTF").contains(filter_str)).map(|node| *node).collect();
+
         let mut map: HashMap<&TreeNode, TreeItem<String> > = HashMap::new();
 
         for &node in nodes_vec.iter().rev() {
@@ -236,7 +242,7 @@ impl App {
 
         frame.render_stateful_widget(list, hlayout[0], &mut self.list_state);
         let current_layer = &self.item.layers[self.selected_layer];
-        let items = App::construct_items(current_layer);
+        let items = App::construct_items(current_layer, &self.search_bar_content);
 
         if self.tree_state.selected().len() == 0 {
             self.tree_state.select_first();
@@ -295,6 +301,9 @@ impl App {
                             self.search_bar_content.pop();
                         }
                         KeyCode::Enter => {
+                            self.focus = Focus::Tree;
+                        }
+                        KeyCode::Esc => {
                             self.focus = Focus::Tree;
                         }
                         _ => {}

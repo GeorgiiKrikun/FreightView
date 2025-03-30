@@ -7,6 +7,7 @@ use serde::{
     Deserialize, 
     Serialize
 };
+use tui_tree_widget::Tree;
 
 #[derive(Clone,Serialize,Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
@@ -64,16 +65,21 @@ impl TreeNode {
     }
 
     pub fn prettyfy(mut self) -> TreeNode {
+        let mut out_node : TreeNode;
         if self.kids.len() == 1 {
             let mut kid = self.kids.remove(0);
             if kid.path == PathBuf::from("") {
                 kid.path = PathBuf::from("/");
             }
-            return kid;
+            out_node = kid;
         } else {
             println!("Prettyfying node with {} children is not feasible", self.kids.len());
-            return self;
+            out_node = self;
         }
+
+        
+
+        out_node
 
     }
 
@@ -137,6 +143,8 @@ impl TreeNode {
             kid.print_tree(depth + 1);
         }
     }
+    
+
 }
 
 // Parse directory into tree
@@ -150,7 +158,12 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
     let metadata = metadata.unwrap();
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
-    let node = TreeNode::new(&ftype, &FileOp::Add, &rel_path);
+    let mut node_path = rel_path.clone();
+    if ! node_path.starts_with("/") {
+        node_path = PathBuf::from("/").join(node_path);
+    }
+    
+    let node = TreeNode::new(&ftype, &FileOp::Add, &node_path);
     let node = parent.add_child(node);
 
     match &ftype {
@@ -185,5 +198,23 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
         &DDiveFileType::Badfile => {
             // Do nothing
         }   
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::parse_directory_into_tree;
+
+    #[test]
+    fn test_parse_directory_into_tree() {
+        let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let test_dir = project_dir.join("test-files");
+        let mut parent = super::TreeNode::new(&super::DDiveFileType::Directory, &super::FileOp::Add, &PathBuf::from(""));
+
+        parse_directory_into_tree(&test_dir, test_dir.clone(), &mut parent);
+        let parent = parent.prettyfy();
+        parent.print_tree(0);
     }
 }
