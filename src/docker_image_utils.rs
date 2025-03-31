@@ -19,6 +19,11 @@ use crate::docker_file_tree::{
     parse_directory_into_tree
 };
 
+use serde::Deserialize;
+use std::collections::HashMap;
+
+
+
 pub struct ImageLayer {
     pub name: String,
     pub tree: TreeNode,
@@ -247,4 +252,105 @@ pub fn unpack_image_layers(layer_folder: &PathBuf, layers: &Vec<String> ) -> Vec
     }
 
     layer_trees
+}
+
+pub fn get_manifest_config_file(docker_root_folder: &PathBuf) -> String  {
+    let manifest_path = docker_root_folder.join("manifest.json");
+    let manifest_file = File::open(&manifest_path).expect("Can't open manifest file");
+    let manifest : Vec<Manifest> = serde_json::from_reader(manifest_file).expect("Can't parse manifest file");
+    if manifest.len() != 1 {
+        panic!("Can't parse manifest file, expected 1 image, got {}", manifest.len());
+    }
+    let config_file = &manifest[0].Config;
+    config_file.clone()
+}
+
+pub fn get_layer_commands(docker_root_folder: &PathBuf, config_file : &str) -> Vec<String> {
+    let config_path = docker_root_folder.join(config_file);
+    let config_file = File::open(&config_path).expect("Can't open config file");
+    let config : Config = serde_json::from_reader(config_file).expect("Can't parse config file");
+    let mut commands : Vec<String> = Vec::new();
+    for history in config.history {
+        match history.empty_layer {
+            Some(empty) => { 
+                if empty {
+                    continue;
+                } else {
+                    commands.push(history.created_by.trim().to_string());
+                }
+            },
+            None => {
+                commands.push(history.created_by.trim().to_string());
+            }
+        }
+    }
+
+    commands
+}
+
+#[derive(Debug, Deserialize)]
+struct Manifest {
+    Config: String,
+    RepoTags: Option<Vec<String>>,
+    Layers: Vec<String>,
+    LayerSources: Option<HashMap<String, LayerSource>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LayerSource {
+    mediaType: String,
+    size: u64,
+    digest: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    history: Vec<History>,
+}
+
+#[derive(Debug, Deserialize)]
+struct History {
+    created: String,
+    created_by: String,
+    empty_layer: Option<bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::remove_dir_all;
+
+    const DOCKER_FOLDER_PATH: &str = "test-docker-tar/";
+
+    #[test]
+    fn read_manifest_file() {
+        let manifest_path = PathBuf::from(DOCKER_FOLDER_PATH).join("manifest.json");
+        let manifest_file = File::open(&manifest_path).expect("Can't open manifest file");
+        let manifest : Vec<Manifest> = serde_json::from_reader(manifest_file).expect("Can't parse manifest file");
+        println!("{:?}", manifest);
+    }
+
+    #[test]
+    fn get_config_file_from_manifest() {
+        let docker_root_folder = PathBuf::from(DOCKER_FOLDER_PATH);
+        let config_file = get_manifest_config_file(&docker_root_folder);
+        assert_eq!(config_file, "blobs/sha256/0d99781172fa4757fb472183792b0d6e1df6d180d6361ea0ae5872ee4adc1f1c");
+    }
+
+    #[test]
+    fn read_config_file() {
+        let docker_root_folder = PathBuf::from(DOCKER_FOLDER_PATH);
+        let config_file = get_manifest_config_file(&docker_root_folder);
+        let commands = get_layer_commands(&docker_root_folder, &config_file);
+        print!("{:?}", commands);
+        assert_eq!(commands.len(), 5);
+        assert_eq!(commands[0], "/bin/sh -c #(nop) ADD file:1b6c8c9518be42fa2afe5e241ca31677fce58d27cdfa88baa91a65a259be3637 in /");
+        assert_eq!(commands[1], "RUN /bin/sh -c mkdir -p /home/georgii # buildkit");
+        assert_eq!(commands[2], "RUN /bin/sh -c echo \"Hello, Georgii!\" > /home/georgii/hello.txt # buildkit");
+        assert_eq!(commands[3], "RUN /bin/sh -c echo \"Hello, Georgii2!\" > /home/georgii/hello2.txt # buildkit");
+        assert_eq!(commands[4], "RUN /bin/sh -c rm /home/georgii/hello.txt # buildkit");
+    }
+
+
+
 }
