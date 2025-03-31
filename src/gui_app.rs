@@ -1,4 +1,4 @@
-use crate::docker_file_tree::TreeNode;
+use crate::docker_file_tree::{FileOp, TreeNode};
 use crate::docker_image_utils::{
     ImageLayer, 
     ImageRepr
@@ -8,6 +8,7 @@ use std::{
     time::Duration, 
 };
 use std::io;
+use ratatui::text::Text;
 use ratatui::widgets::Paragraph;
 use ratatui::{
     layout::{
@@ -112,15 +113,25 @@ impl App {
                 Some(try_name) => {
                     name = try_name.to_str().expect("WTF").to_string();
                 },
-                None => {
-                }
+                None => {}
             }
                     
             let path = String::from(node.path().to_str().expect("WTF"));
             // let name  = String::from(node.path().file_name().expect("WTF").to_str().expect("WTF"));
 
+            let name: Text = match node.fop() {
+                FileOp::Add => {
+                    let style = Style::new().fg(Color::Green);
+                    Text::styled(name, style)
+                },
+                FileOp::Remove => {
+                    let style = Style::new().fg(Color::Red);
+                    Text::styled(name, style)
+                },
+            };
+
             if node.kids().len() == 0 {
-                let leaf = TreeItem::new_leaf(path.clone(), name.clone());
+                let leaf = TreeItem::new_leaf(path.clone(), name);
                 map.insert(node, leaf);
             } else {               
                 let kids = node.kids();
@@ -130,7 +141,7 @@ impl App {
                     let kid_item : TreeItem<String> = map.remove(kid).expect("Can't find child in map");
                     kids_items.push(kid_item);
                 }
-                let tree_item = TreeItem::new(path.clone(), name.clone(), kids_items).expect("Can't create tree item");
+                let tree_item = TreeItem::new(path.clone(), name, kids_items).expect("Can't create tree item");
                 map.insert(node, tree_item);
             }
         }

@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{
     collections::VecDeque, 
     path::PathBuf
@@ -224,9 +225,23 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
     let metadata = metadata.unwrap();
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
-    let mut node_path = rel_path.clone();
-    let mut file_name = node_path.file_name().unwrap().to_str().unwrap();
-    let mut dir_name = String::from(node_path.parent().unwrap().to_str().unwrap());
+    let node_path = rel_path.clone();
+    
+    let mut file_name = match node_path.file_name() {
+        Some(name) => name.to_str().unwrap(),
+        None => {""}
+            
+    };
+
+    let dir_name = node_path.parent();
+    let mut dir_name: String = match dir_name {
+        Some(name) => {
+            String::from(name.to_str().unwrap())
+        }
+        None => {
+            String::from("")
+        }  
+    };
     
     let op = if file_name.starts_with(".wh.") {
         file_name = file_name.strip_prefix(".wh.").unwrap();
@@ -237,6 +252,10 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
 
     if !dir_name.starts_with("/") {
         dir_name = format!("/{}", dir_name);
+    }
+
+    if !dir_name.ends_with("/") {
+        dir_name = format!("{}/", dir_name);
     }
 
     let final_path = PathBuf::from(format!("{}{}", dir_name, file_name));
@@ -374,17 +393,28 @@ mod tests {
         let mut out = String::new();
         filtered_tree.unwrap().print_tree(0, &mut out);
         let out = out.split("\n").collect::<Vec<&str>>();
+        for line in &out {
+            println!("{}", line);
+        }
 
-        assert_eq!(out[0].trim(), "Directory</>: Add");
-        assert_eq!(out[1].trim(), "Directory</subtest>: Add");
-        assert_eq!(out[2].trim(), "File</subtest/subtestfile>: Add");
-        assert_eq!(out[3].trim(), "Directory</subtest/subsubtest>: Add");
-        assert_eq!(out[4].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
-        assert_eq!(out[5].trim(), "Directory</subtest/subsubtest2>: Add");  
-        assert_eq!(out[6].trim(), "Directory</subtest2>: Add");
-        assert_eq!(out[7].trim(), "File</subtest2/subfile2>: Add");
-        assert_eq!(out[8].trim(), "Directory</subtest2/subsubtest2>: Add");
-        assert_eq!(out[9].trim(), "File</subtest2/subsubtest2/subsubfile2>: Add");
+        let outputs = [
+            "Directory</>: Add",
+            "Directory</subtest>: Add",
+            "File</subtest/subtestfile>: Add",
+            "Directory</subtest/subsubtest>: Add",
+            "File</subtest/subsubtest/subsubtestfile>: Add",
+            "Directory</subtest/subsubtest2>: Add",
+            "Directory</subtest2>: Add",
+            "File</subtest2/whatever>: Remove",
+            "File</subtest2/subfile2>: Add",
+            "Directory</subtest2/subsubtest2>: Add",
+            "File</subtest2/subsubtest2/subsubfile2>: Add",
+        ];
+
+        for i in (0..outputs.len()) {
+            assert_eq!(out[i].trim(), outputs[i]);
+        }
+
 
     }
 }
