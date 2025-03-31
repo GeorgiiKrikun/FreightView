@@ -1,0 +1,78 @@
+{
+    "architecture": "amd64",
+    "config": {
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ],
+        "Cmd": [
+            "/bin/bash"
+        ],
+        "Labels": {
+            "org.opencontainers.image.ref.name": "ubuntu",
+            "org.opencontainers.image.version": "22.04"
+        }
+    },
+    "created": "2025-03-26T16:19:49.51815631+01:00",
+    "history": [
+        {
+            "created": "2025-01-26T05:31:07.539614275Z",
+            "created_by": "/bin/sh -c #(nop)  ARG RELEASE",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-01-26T05:31:07.596069001Z",
+            "created_by": "/bin/sh -c #(nop)  ARG LAUNCHPAD_BUILD_ARCH",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-01-26T05:31:07.693457189Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.ref.name=ubuntu",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-01-26T05:31:07.741775377Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.version=22.04",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-01-26T05:31:10.757640652Z",
+            "created_by": "/bin/sh -c #(nop) ADD file:1b6c8c9518be42fa2afe5e241ca31677fce58d27cdfa88baa91a65a259be3637 in / "
+        },
+        {
+            "created": "2025-01-26T05:31:11.215737135Z",
+            "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/bash\"]",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-03-26T16:19:49.048515213+01:00",
+            "created_by": "RUN /bin/sh -c mkdir -p /home/georgii # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-03-26T16:19:49.201753843+01:00",
+            "created_by": "RUN /bin/sh -c echo \"Hello, Georgii!\" > /home/georgii/hello.txt # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-03-26T16:19:49.36844864+01:00",
+            "created_by": "RUN /bin/sh -c echo \"Hello, Georgii2!\" > /home/georgii/hello2.txt # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-03-26T16:19:49.51815631+01:00",
+            "created_by": "RUN /bin/sh -c rm /home/georgii/hello.txt # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+            "sha256:270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af",
+            "sha256:c8496e2c2de7ada069280d8eab272b13a7010f098d770af7b403cc05ab88cc42",
+            "sha256:e7071b63655b3bcafc3e1bad1918a9359cfb7c20b64fb96af686e1dfec28e35b",
+            "sha256:edf5ad180375f3003882847042278945efdddffff5746d099c6d57d8c4bd99ab",
+            "sha256:e4862e938301df7ab3eb13568c9567991ebacea2de288507814164634668210d"
+        ]
+    }
+}
