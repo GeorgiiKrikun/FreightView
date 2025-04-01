@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 use futures_core::task::Poll;
 use home::home_dir;
 use tempfile::TempDir;
-use std::mem::swap;
+use std::{io::Read, mem::swap};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -27,13 +27,15 @@ use std::collections::HashMap;
 pub struct ImageLayer {
     pub name: String,
     pub tree: TreeNode,
+    pub command: String,
 }
 
 impl ImageLayer {
-    pub fn new(name: String, tree: TreeNode) -> ImageLayer {
+    pub fn new(name: String, tree: TreeNode, command: String) -> ImageLayer {
         ImageLayer {
-            name: name,
-            tree: tree,
+            name,
+            tree,
+            command,
         }
     }
 
@@ -54,18 +56,36 @@ impl ImageLayer {
         ImageLayer::get_layer_path_wstr(&self.name)
     }
 
+    fn get_layer_path_cmd_wstr(layer : &str) -> PathBuf {
+        ImageLayer::get_cache_dir().join(layer).with_extension("cmd")
+    }
+
+    fn get_layer_path_cmd(&self) -> PathBuf {
+        ImageLayer::get_layer_path_cmd_wstr(&self.name)
+    }
+
     pub fn save(&self) {
+        // Serialise tree to json
         let layer_cache_path = self.get_layer_path();
         let mut layer_cache_file = File::create(&layer_cache_path).expect("Can't create layer cache file");
         let layer_json = serde_json::to_string(&self.tree).expect("Can't serialize layer tree");
         layer_cache_file.write_all(layer_json.as_bytes()).expect("Can't write to layer cache file");        
+        // Serialise command to file
+        let cmd_cache_file = self.get_layer_path_cmd();
+        let mut cmd_cache_file = File::create(&cmd_cache_file).expect("Can't create command cache file");
+        cmd_cache_file.write_all(self.command.as_bytes()).expect("Can't write to command cache file");
     }
 
     pub fn load(layer : &str) -> Result<ImageLayer, Box<dyn std::error::Error> > {
         let layer_cache_path = ImageLayer::get_layer_path_wstr(layer);
         let layer_cache_file = File::open(&layer_cache_path)?;
         let layer_tree : TreeNode = serde_json::from_reader(layer_cache_file)?;
-        Ok(ImageLayer::new(layer.to_string(), layer_tree))
+        let cmd_cache_file = ImageLayer::get_layer_path_cmd_wstr(layer);
+        let mut cmd_cache_file = File::open(&cmd_cache_file)?;
+        let mut command = String::new();
+        cmd_cache_file.read_to_string(&mut command)?;
+
+        Ok(ImageLayer::new(layer.to_string(), layer_tree, command))
     }
 
     pub fn check_cache(layer : &str ) -> bool {
@@ -149,10 +169,20 @@ impl ImageRepr {
 
         // get non-cached layers
         let layer_trees: Vec<(String, TreeNode)> = unpack_image_layers(&layer_folder, &non_cached_layers);
+        let manifest_file = get_manifest_config_file(&img_folder);
+        let mut commands = get_layer_commands(&img_folder, &manifest_file);
+        
+        if (commands.len() != layer_trees.len()) {
+            print!("Commands and layers size mismatch; commands won't be printed");
+            commands.clear();
+            commands.resize(layer_trees.len(), String::from("Not available"));
+
+        }
+
 
         // Construct cache from non-cached layers
-        for (layer_name, layer_tree) in layer_trees {
-            let layer = ImageLayer::new(layer_name, layer_tree);
+        for ((layer_name, layer_tree), command) in layer_trees.into_iter().zip(commands.into_iter()) {
+            let layer = ImageLayer::new(layer_name, layer_tree, command);
             layer.save();
         }
 

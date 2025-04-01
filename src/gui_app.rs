@@ -8,8 +8,9 @@ use std::{
     time::Duration, 
 };
 use std::io;
+use ratatui::layout;
 use ratatui::text::Text;
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Clear, Paragraph};
 use ratatui::{
     layout::{
         Constraint, 
@@ -79,6 +80,10 @@ impl App {
 
     fn layer_names(&self) -> Vec<String> {
         self.item.layers.iter().map(|layer| layer.name.clone()).collect()
+    }
+
+    fn get_layer_command(&self) -> &String {
+        &self.item.layers[self.selected_layer].command
     }
 
     fn next_list(&mut self) {
@@ -223,6 +228,11 @@ impl App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(vlayout[0]);
 
+        let vlayout_left = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(hlayout[0]);
+
         let items: Vec<ListItem> = self
             .layer_names()
             .iter()
@@ -254,7 +264,24 @@ impl App {
         )
         .highlight_symbol(">> ");
 
-        frame.render_stateful_widget(list, hlayout[0], &mut self.list_state);
+        frame.render_stateful_widget(list, vlayout_left[0], &mut self.list_state);
+
+        // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
+        // let command = List::new(text)
+        // .block(Block::default().borders(Borders::ALL).title("Command"));
+
+        let command :Paragraph = Paragraph::new(App::remove_control_chars_from_string(self.get_layer_command()))
+            .block(Block::default().borders(Borders::ALL).title("Command"))
+            .wrap(ratatui::widgets::Wrap { trim: true });
+            
+        
+        // let command_help_window = Text::from(text);
+
+            // .block(Block::default().borders(Borders::ALL).title("Layer information"))
+            // .wrap(ratatui::widgets::Wrap { trim: true }); // Enable text wrapping; 
+        
+        frame.render_widget(command, vlayout_left[1]);
+
         let current_layer = &self.item.layers[self.selected_layer];
         let items = App::construct_items(current_layer, &self.search_bar_content);
 
@@ -280,6 +307,52 @@ impl App {
             .title(search_title));
 
         frame.render_widget(search, vlayout[1]);
+        // frame.render_widget(Clear, frame.area());
+
+    }
+
+    fn split_string_into_size(s: &str, size: usize) -> String {
+        let mut res = String::default();
+        if (s.len() <= size) {
+            return s.to_string();
+        }
+        let mut current_pos = 0;
+        while current_pos < s.len() - size {
+            res.push_str(&s[current_pos..current_pos + size]);
+            res.push('\n');
+            current_pos += size;
+        }
+
+        res.push_str(&s[current_pos..s.len()]);
+        return res;
+    }
+
+    fn split_string_into_vec(s: &str, size: usize) -> Vec<String> {
+        let mut res = Vec::new();
+        let mut current_pos = 0;
+        let mut s = s.to_string();
+        s.retain(|c| !c.is_control());
+
+        if (s.len() <= size) {
+            return vec![s.to_string()];
+        }
+        while current_pos < s.len() - size {
+            res.push(s[current_pos..current_pos + size].to_string());
+            current_pos += size;
+        }
+
+        res.push(s[current_pos..s.len()].to_string());
+        return res;
+    }
+
+    fn remove_control_chars_from_string(s: &str) -> String {
+        let mut res = String::default();
+        for c in s.chars() {
+            if !c.is_control() {
+                res.push(c);
+            }
+        }
+        res
     }
 
     fn get_all_key_events() -> Vec<KeyEvent> {
