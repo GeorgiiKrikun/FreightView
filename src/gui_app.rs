@@ -8,9 +8,10 @@ use std::{
     time::Duration, 
 };
 use std::io;
-use ratatui::layout;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{self, Rect};
 use ratatui::text::Text;
-use ratatui::widgets::{Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph, StatefulWidget};
 use ratatui::{
     layout::{
         Constraint, 
@@ -46,6 +47,8 @@ use tui_tree_widget::{
     TreeState
 };
 
+use ratatui::prelude::Widget;
+
 enum Focus {
     List,
     Tree,
@@ -54,44 +57,109 @@ enum Focus {
 
 pub struct App {
     item: ImageRepr,
-    selected_layer: usize,
+    layer_list: LayerBrowserWidget,
     exit: bool,
-    list_state: ListState,
     tree_state: TreeState<String>,
+    list_state: ListState,
     focus: Focus,
     search_bar_content: String,
 }
 
+struct LayerBrowserWidget {
+    layer_names: Vec<String>,
+    layer_commands: Vec<String>,
+}
+
+impl LayerBrowserWidget {
+    fn new(layer_names: Vec<String>, layer_commands: Vec<String> ) -> Self {
+        let mut command_wo_special_symbols : Vec<String> = Vec::new();
+        for command in layer_commands.iter() {
+            let command = App::remove_control_chars_from_string(command);
+            command_wo_special_symbols.push(command);
+        }
+
+        Self { layer_names, 
+               layer_commands: command_wo_special_symbols }
+    }
+
+    fn next(&self, state : &mut ListState) {
+        if let Some(selected) = state.selected() {
+            if selected < self.layer_names.len() - 1 {
+                state.select(Some(selected + 1));
+            }
+        }
+    }
+
+    fn prev(state : &mut ListState) {
+        if let Some(selected) = state.selected() {
+            if selected > 0 {
+                state.select(Some(selected - 1));
+            }
+        }
+    }
+}
+
+impl<'a> StatefulWidget for &'a mut LayerBrowserWidget {
+    type State = ListState;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State){ 
+        let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(area);
+        
+        // Create the List widget
+        let list = List::new(self.layer_names.clone())
+        .block(Block::default().borders(Borders::ALL).title("Layers"))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+
+        // Render the List widget with its state
+        StatefulWidget::render(list, layout[0], buf, state);
+
+
+
+        // Create the Command widget
+        let command :Paragraph = Paragraph::new(self.layer_commands[state.selected().unwrap_or(0)].clone())
+        .block(Block::default().borders(Borders::ALL).title("Command"))
+        .wrap(ratatui::widgets::Wrap { trim: true });
+        
+        Widget::render(command, layout[1], buf);
+
+    }
+}
+
 impl App {
     pub fn new(item: ImageRepr) -> App {
+        let tree_state: TreeState<String> = TreeState::default();
+        let layer_names : Vec<String> = App::layer_names_from_img(&item);
+        let layer_commands : Vec<String> = item.layers.iter().map(|layer| layer.command.clone()).collect();
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        let tree_state: TreeState<String> = TreeState::default();
         App { 
-            item, 
-            selected_layer: 0, 
-            exit: false, 
-            list_state, 
-            tree_state, 
+            item,
+            exit: false,
+            layer_list : LayerBrowserWidget::new(layer_names, layer_commands),
+            list_state,
+            tree_state,
             focus: Focus::List,
-            search_bar_content: "".to_string(),
+            search_bar_content: "".to_string()
         }
+    }
+
+    fn layer_names_from_img(img : &ImageRepr) -> Vec<String> {
+        img.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
     fn layer_names(&self) -> Vec<String> {
         self.item.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
-    fn get_layer_command(&self) -> &String {
-        &self.item.layers[self.selected_layer].command
-    }
-
-    fn next_list(&mut self) {
-        if self.selected_layer < self.layer_names().len() - 1 {
-            self.selected_layer += 1;
-            self.list_state.select(Some(self.selected_layer));
-        }
-    }
 
     fn construct_items<'a>(layer : &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, String> > {
         let tree = &layer.tree;
@@ -177,16 +245,10 @@ impl App {
 
     fn next(&mut self) {
         match self.focus {
-            Focus::List => self.next_list(),
+            
+            Focus::List => (&self.layer_list).next(&mut self.list_state),
             Focus::Tree => self.next_tree(),
             Focus::SearchBar => {}
-        }
-    }
-
-    fn previous_list(&mut self) {
-        if self.selected_layer > 0 {
-            self.selected_layer -= 1;
-            self.list_state.select(Some(self.selected_layer));
         }
     }
 
@@ -198,7 +260,7 @@ impl App {
 
     fn previous(&mut self) {
         match self.focus {
-            Focus::List => self.previous_list(),
+            Focus::List => LayerBrowserWidget::prev(&mut self.list_state),
             Focus::Tree => self.previous_tree(),
             Focus::SearchBar => {}
         }
@@ -228,16 +290,13 @@ impl App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(vlayout[0]);
 
-        let vlayout_left = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(hlayout[0]);
 
-        let items: Vec<ListItem> = self
-            .layer_names()
-            .iter()
-            .map(|i| ListItem::new(Span::from(i.clone())))
-            .collect();
+
+        // let items: Vec<ListItem> = self
+        //     .layer_names()
+        //     .iter()
+        //     .map(|i| ListItem::new(Span::from(i.clone())))
+        //     .collect();
 
         let list_title = match self.focus {
             Focus::List => "😍 Layers ",
@@ -254,60 +313,52 @@ impl App {
             _ => "Search",
         };
 
-        let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(list_title))
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
+        // let list = List::new(items)
+        // .block(Block::default().borders(Borders::ALL).title(list_title))
+        // .highlight_style(
+        //     Style::default()
+        //         .bg(Color::Blue)
+        //         .fg(Color::White)
+        //         .add_modifier(Modifier::BOLD),
+        // )
+        // .highlight_symbol(">> ");
 
-        frame.render_stateful_widget(list, vlayout_left[0], &mut self.list_state);
+        // let list = LayerBrowserWidget::new(self.layer_names(), );
+
+        frame.render_stateful_widget((&mut self.layer_list), hlayout[0], &mut self.list_state);
 
         // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
         // let command = List::new(text)
         // .block(Block::default().borders(Borders::ALL).title("Command"));
 
-        let command :Paragraph = Paragraph::new(App::remove_control_chars_from_string(self.get_layer_command()))
-            .block(Block::default().borders(Borders::ALL).title("Command"))
-            .wrap(ratatui::widgets::Wrap { trim: true });
-            
-        
-        // let command_help_window = Text::from(text);
 
-            // .block(Block::default().borders(Borders::ALL).title("Layer information"))
-            // .wrap(ratatui::widgets::Wrap { trim: true }); // Enable text wrapping; 
-        
-        frame.render_widget(command, vlayout_left[1]);
 
-        let current_layer = &self.item.layers[self.selected_layer];
-        let items = App::construct_items(current_layer, &self.search_bar_content);
+        // let current_layer = &self.item.layers[self.selected_layer];
+        // let items = App::construct_items(current_layer, &self.search_bar_content);
 
-        if self.tree_state.selected().len() == 0 {
-            self.tree_state.select_first();
-        }
+        // if self.tree_state.selected().len() == 0 {
+        //     self.tree_state.select_first();
+        // }
 
-        let tree_widget = Tree::new(&items).expect("WTF")
-        .block(Block::default().borders(Borders::ALL).title(tree_title))
-        .highlight_style(
-                Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
+        // let tree_widget = Tree::new(&items).expect("WTF")
+        // .block(Block::default().borders(Borders::ALL).title(tree_title))
+        // .highlight_style(
+        //         Style::default()
+        //         .bg(Color::Blue)
+        //         .fg(Color::White)
+        //         .add_modifier(Modifier::BOLD),
+        // )
+        // .highlight_symbol(">> ");
 
-        frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
+        // frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
 
-        let search = Paragraph::new(self.search_bar_content.clone())
-            .block(Block::default()
-            .borders(Borders::ALL)
-            .title(search_title));
+        // let search = Paragraph::new(self.search_bar_content.clone())
+        //     .block(Block::default()
+        //     .borders(Borders::ALL)
+        //     .title(search_title));
 
-        frame.render_widget(search, vlayout[1]);
-        // frame.render_widget(Clear, frame.area());
+        // frame.render_widget(search, vlayout[1]);
+        // // frame.render_widget(Clear, frame.area());
 
     }
 
