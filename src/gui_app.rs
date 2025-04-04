@@ -55,51 +55,47 @@ enum Focus {
     SearchBar,
 }
 
+fn next_list_state(state : &mut ListState, size : usize) {
+    if let Some(selected) = state.selected() {
+        if selected < size - 1 {
+            state.select(Some(selected + 1));
+        }
+    }
+}
+
+fn prev_list_state(state : &mut ListState) {
+    if let Some(selected) = state.selected() {
+        if selected > 0 {
+            state.select(Some(selected - 1));
+        }
+    }
+}
+
 pub struct App {
     item: ImageRepr,
-    layer_list: LayerBrowserWidget,
     exit: bool,
     tree_state: TreeState<String>,
     list_state: ListState,
+    layer_names: Vec<String>,
+    layer_commands: Vec<String>,
+    n_layers: usize,
     focus: Focus,
     search_bar_content: String,
 }
 
-struct LayerBrowserWidget {
-    layer_names: Vec<String>,
-    layer_commands: Vec<String>,
+struct LayerBrowserWidget<'a> {
+    layer_names: &'a Vec<String>,
+    layer_commands: &'a Vec<String>,
 }
 
-impl LayerBrowserWidget {
-    fn new(layer_names: Vec<String>, layer_commands: Vec<String> ) -> Self {
-        let mut command_wo_special_symbols : Vec<String> = Vec::new();
-        for command in layer_commands.iter() {
-            let command = App::remove_control_chars_from_string(command);
-            command_wo_special_symbols.push(command);
-        }
-
+impl<'a> LayerBrowserWidget<'a> {
+    fn new(layer_names: &'a Vec<String>, layer_commands: &'a Vec<String> ) -> Self {
         Self { layer_names, 
-               layer_commands: command_wo_special_symbols }
-    }
-
-    fn next(&self, state : &mut ListState) {
-        if let Some(selected) = state.selected() {
-            if selected < self.layer_names.len() - 1 {
-                state.select(Some(selected + 1));
-            }
-        }
-    }
-
-    fn prev(state : &mut ListState) {
-        if let Some(selected) = state.selected() {
-            if selected > 0 {
-                state.select(Some(selected - 1));
-            }
-        }
+               layer_commands }
     }
 }
 
-impl<'a> StatefulWidget for &'a mut LayerBrowserWidget {
+impl<'a> StatefulWidget for LayerBrowserWidget<'a> {
     type State = ListState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State){ 
@@ -139,12 +135,22 @@ impl App {
         let tree_state: TreeState<String> = TreeState::default();
         let layer_names : Vec<String> = App::layer_names_from_img(&item);
         let layer_commands : Vec<String> = item.layers.iter().map(|layer| layer.command.clone()).collect();
+        if layer_names.len() == 0 {
+            panic!("No layers found in image");
+        }
+        if layer_names.len() != layer_commands.len() {
+            panic!("Layer names and commands are not the same length");
+        }
+        let n_layers = layer_names.len();
+
         let mut list_state = ListState::default();
         list_state.select(Some(0));
         App { 
             item,
             exit: false,
-            layer_list : LayerBrowserWidget::new(layer_names, layer_commands),
+            layer_names,
+            layer_commands,
+            n_layers,
             list_state,
             tree_state,
             focus: Focus::List,
@@ -246,7 +252,7 @@ impl App {
     fn next(&mut self) {
         match self.focus {
             
-            Focus::List => (&self.layer_list).next(&mut self.list_state),
+            Focus::List => next_list_state(&mut self.list_state, self.n_layers),
             Focus::Tree => self.next_tree(),
             Focus::SearchBar => {}
         }
@@ -258,9 +264,11 @@ impl App {
         });
     }
 
+
+
     fn previous(&mut self) {
         match self.focus {
-            Focus::List => LayerBrowserWidget::prev(&mut self.list_state),
+            Focus::List => prev_list_state(&mut self.list_state),
             Focus::Tree => self.previous_tree(),
             Focus::SearchBar => {}
         }
@@ -323,9 +331,9 @@ impl App {
         // )
         // .highlight_symbol(">> ");
 
-        // let list = LayerBrowserWidget::new(self.layer_names(), );
+        let layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
 
-        frame.render_stateful_widget((&mut self.layer_list), hlayout[0], &mut self.list_state);
+        frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
         // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
         // let command = List::new(text)
