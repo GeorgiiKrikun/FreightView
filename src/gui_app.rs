@@ -46,11 +46,11 @@ use tui_tree_widget::{
     TreeItem, 
     TreeState
 };
-use crate::widgets::navigation_traits::Navigation;
+use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
 
 use ratatui::prelude::Widget;
 
-use crate::widgets::layer_browser_widget::LayerBrowserWidget;
+use crate::widgets::layer_browser_widget::{self, LayerBrowserWidget};
 
 enum Focus {
     List,
@@ -142,6 +142,9 @@ impl App {
 
     fn adjust_tree_state_to_list(&mut self) {
         let selected = self.list_state.selected().unwrap_or(0);
+        if selected >= self.layer_names.len() {
+            return;
+        }
         let selected_layer = &self.layer_names[selected];
         self.tree_state.current_layer = selected_layer.to_string();
     }
@@ -150,7 +153,7 @@ impl App {
         match self.focus {
             
             Focus::List => {
-                ListState::next(&mut self.list_state, self.n_layers);
+                self.list_state.next();
                 self.adjust_tree_state_to_list();
             },
             Focus::Tree => {},
@@ -167,7 +170,7 @@ impl App {
     fn previous(&mut self) {
         match self.focus {
             Focus::List => {
-                ListState::prev(&mut self.list_state);
+                self.list_state.prev();
                 self.adjust_tree_state_to_list();
             },
             Focus::Tree => {},
@@ -231,7 +234,7 @@ impl App {
         // .highlight_symbol(">> ");
 
         let layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
-
+        layers_and_commands.ensure_bounds(&mut self.list_state);
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
         // Test tree widget

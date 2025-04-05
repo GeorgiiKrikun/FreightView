@@ -2,7 +2,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListState, Paragraph, StatefulWidget, Widget};
-use crate::widgets::navigation_traits::Navigation;
+use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
 
 pub struct LayerBrowserWidget<'a> {
     layer_names: &'a Vec<String>,
@@ -16,26 +16,37 @@ impl<'a> LayerBrowserWidget<'a> {
     }
 }
 
-impl Navigation<ListState> for ListState {
-    fn next(state: &mut ListState, max: usize) {
-        if let Some(selected) = state.selected() {
-            if selected < max - 1 {
-                state.select(Some(selected + 1));
-            }
+impl WidgetNav for ListState {
+    fn next(&mut self) {
+        if let Some(selected) = self.selected() {
+                self.select(Some(selected + 1));
         } else {
-            state.select(Some(0));
+            self.select(Some(0));
         }        
     }
 
-    fn prev(state: &mut ListState) {
-        if let Some(selected) = state.selected() {
+    fn prev(&mut self) {
+        if let Some(selected) = self.selected() {
             if selected > 0 {
-                state.select(Some(selected - 1));
+                self.select(Some(selected - 1));
             }
         } else {
-            state.select(Some(0));
+            self.select(Some(0));
         }
     }
+}
+
+impl<'a> WidgetNavBounds<ListState> for LayerBrowserWidget<'a> {
+    fn ensure_bounds(&self, state: &mut ListState) {
+        let max = self.layer_names.len();
+        if let Some(selected) = state.selected() {
+            if selected >= max {
+                state.select(Some(max - 1));
+            }
+            // the < 0 case is handled by the prev() method, since it might lead to integer overflow
+        }
+    }
+
 }
 
 impl<'a> StatefulWidget for LayerBrowserWidget<'a> {

@@ -1,5 +1,10 @@
-// This file defines the Navigation trait for navigating through a list or tree of items.
-pub trait Navigation<WidgetState> {
-    fn next(state: &mut WidgetState, max: usize);
-    fn prev(state: &mut WidgetState);
+pub trait WidgetNav
+{
+    fn next(&mut self);
+    fn prev(&mut self);
+}
+
+pub trait WidgetNavBounds<WidgetState : WidgetNav> {
+    // Because widget bounds are not know before rendering, we need to pass the widget state
+    fn ensure_bounds(&self, state: &mut WidgetState);
 }

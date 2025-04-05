@@ -9,6 +9,8 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 use crate::docker_file_tree::{FileOp, TreeNode};
 use crate::docker_image_utils::ImageLayer;
 
+use super::navigation_traits::WidgetNav;
+
 fn construct_items<'a>(layer : &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, String> > {
     let tree = &layer.tree;
     let filtered_tree = tree.filter_tree_full_path(filter_str);
@@ -90,7 +92,22 @@ impl TreeBrowserWidgetState {
             tree_state: TreeState::default(),
         }
     }
-} 
+}
+
+// impl WidgetNavigation for TreeBrowserWidgetState {
+//     fn next(&mut self, max: usize) {
+//         if let Some(selected) = self.tree_state.selected() {
+//             if selected < max - 1 {
+//                 self.tree_state.select(Some(selected + 1));
+//             }
+//         } else {
+//             self.tree_state.select(Some(0));
+//         }        
+//     }
+
+    
+//     }
+// }
 
 pub struct TreeBrowserWidget<'a> {
     corresponding_layer: &'a ImageLayer,
