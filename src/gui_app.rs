@@ -99,7 +99,7 @@ impl App {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
 
-        let mut app = App { 
+        App { 
             item,
             exit: false,
             layer_names,
@@ -109,9 +109,7 @@ impl App {
             focus: Focus::List,
             search_bar_content: "".to_string(),
             tree_state: TreeBrowserWidgetState::new(""),
-        };
-
-        return app;
+        }
 
     }
 
