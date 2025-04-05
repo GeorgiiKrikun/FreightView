@@ -3,13 +3,12 @@ use crate::docker_image_utils::{
     ImageLayer, 
     ImageRepr
 };
+use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
 use std::{
     collections::HashMap, 
     time::Duration, 
 };
 use std::io;
-use ratatui::buffer::Buffer;
-use ratatui::layout::{self, Rect};
 use ratatui::text::Text;
 use ratatui::widgets::{Clear, Paragraph, StatefulWidget};
 use ratatui::{
@@ -49,6 +48,8 @@ use tui_tree_widget::{
 
 use ratatui::prelude::Widget;
 
+use crate::widgets::layer_browser_widget::LayerBrowserWidget;
+
 enum Focus {
     List,
     Tree,
@@ -74,7 +75,7 @@ fn prev_list_state(state : &mut ListState) {
 pub struct App {
     item: ImageRepr,
     exit: bool,
-    tree_state: TreeState<String>,
+    tree_state: TreeBrowserWidgetState,
     list_state: ListState,
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
@@ -83,56 +84,8 @@ pub struct App {
     search_bar_content: String,
 }
 
-struct LayerBrowserWidget<'a> {
-    layer_names: &'a Vec<String>,
-    layer_commands: &'a Vec<String>,
-}
-
-impl<'a> LayerBrowserWidget<'a> {
-    fn new(layer_names: &'a Vec<String>, layer_commands: &'a Vec<String> ) -> Self {
-        Self { layer_names, 
-               layer_commands }
-    }
-}
-
-impl<'a> StatefulWidget for LayerBrowserWidget<'a> {
-    type State = ListState;
-
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State){ 
-        let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(area);
-        
-        // Create the List widget
-        let list = List::new(self.layer_names.clone())
-        .block(Block::default().borders(Borders::ALL).title("Layers"))
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
-
-        // Render the List widget with its state
-        StatefulWidget::render(list, layout[0], buf, state);
-
-
-
-        // Create the Command widget
-        let command :Paragraph = Paragraph::new(self.layer_commands[state.selected().unwrap_or(0)].clone())
-        .block(Block::default().borders(Borders::ALL).title("Command"))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-        
-        Widget::render(command, layout[1], buf);
-
-    }
-}
-
 impl App {
     pub fn new(item: ImageRepr) -> App {
-        let tree_state: TreeState<String> = TreeState::default();
         let layer_names : Vec<String> = App::layer_names_from_img(&item);
         let layer_commands : Vec<String> = item.layers.iter().map(|layer| layer.command.clone()).collect();
         if layer_names.len() == 0 {
@@ -145,17 +98,21 @@ impl App {
 
         let mut list_state = ListState::default();
         list_state.select(Some(0));
-        App { 
+
+        let mut app = App { 
             item,
             exit: false,
             layer_names,
             layer_commands,
             n_layers,
             list_state,
-            tree_state,
             focus: Focus::List,
-            search_bar_content: "".to_string()
-        }
+            search_bar_content: "".to_string(),
+            tree_state: TreeBrowserWidgetState::new(""),
+        };
+
+        return app;
+
     }
 
     fn layer_names_from_img(img : &ImageRepr) -> Vec<String> {
@@ -166,80 +123,12 @@ impl App {
         self.item.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
-
-    fn construct_items<'a>(layer : &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, String> > {
-        let tree = &layer.tree;
-        let filtered_tree = tree.filter_tree_full_path(filter_str);
-
-        let tree = if let Some(filt_tree) = filtered_tree.as_ref() {
-            filt_tree // Reference to the filtered tree
-        } else {
-            &layer.tree // Reference to the original tree
-        };
     
-        // parents at the start, children at the end
-        let nodes_vec : Vec<&TreeNode> = tree.breadth_first();
-
-        let mut map: HashMap<&TreeNode, TreeItem<String> > = HashMap::new();
-
-        for &node in nodes_vec.iter().rev() {
-            if node == tree { // Skip the root
-                break;
-            }
-            let try_name  = node.path().file_name();
-            let mut name : String = "root".to_string();
-            match try_name {
-                Some(try_name) => {
-                    name = try_name.to_str().expect("WTF").to_string();
-                },
-                None => {}
-            }
-                    
-            let path = String::from(node.path().to_str().expect("WTF"));
-            // let name  = String::from(node.path().file_name().expect("WTF").to_str().expect("WTF"));
-
-            let name: Text = match node.fop() {
-                FileOp::Add => {
-                    let style = Style::new().fg(Color::Green);
-                    Text::styled(name, style)
-                },
-                FileOp::Remove => {
-                    let style = Style::new().fg(Color::Red);
-                    Text::styled(name, style)
-                },
-            };
-
-            if node.kids().len() == 0 {
-                let leaf = TreeItem::new_leaf(path.clone(), name);
-                map.insert(node, leaf);
-            } else {               
-                let kids = node.kids();
-                // Because we are iterating in the reverse order of breadth-first search, we can assume that the children are already in the map
-                let mut kids_items : Vec<TreeItem<String> > = Vec::new();
-                for kid in kids {
-                    let kid_item : TreeItem<String> = map.remove(kid).expect("Can't find child in map");
-                    kids_items.push(kid_item);
-                }
-                let tree_item = TreeItem::new(path.clone(), name, kids_items).expect("Can't create tree item");
-                map.insert(node, tree_item);
-            }
-        }
-
-        // All that should be left in the map are the nodes below the root
-
-        let keys : Vec<TreeItem<String> > = map.into_values().collect();
-        // sort by name
-        let mut keys = keys;
-        keys.sort_by(|a, b| a.identifier().cmp(b.identifier()));
-        keys
-    }
-
-
-    fn next_tree(&mut self) {
-        self.tree_state.select_relative(|current| {
-            current.map_or(0, |current| current.saturating_add(1))
-        });
-    }
+    // fn next_tree(&mut self) {
+    //     self.tree_state.select_relative(|current| {
+    //         current.map_or(0, |current| current.saturating_add(1))
+    //     });
+    // }
 
     fn circle_focus(&mut self) {
         match self.focus {
@@ -253,30 +142,30 @@ impl App {
         match self.focus {
             
             Focus::List => next_list_state(&mut self.list_state, self.n_layers),
-            Focus::Tree => self.next_tree(),
+            // Focus::Tree => self.next_tree(),
+            Focus::Tree => {},
             Focus::SearchBar => {}
         }
     }
 
-    fn previous_tree(&mut self) {
-        self.tree_state.select_relative(|current| {
-            current.map_or(0, |current| current.saturating_sub(1))
-        });
-    }
-
-
-
+    // fn previous_tree(&mut self) {
+    //     self.tree_state.select_relative(|current| {
+    //         current.map_or(0, |current| current.saturating_sub(1))
+    //     });
+    // }
+    
     fn previous(&mut self) {
         match self.focus {
             Focus::List => prev_list_state(&mut self.list_state),
-            Focus::Tree => self.previous_tree(),
+            // Focus::Tree => self.previous_tree(),
+            Focus::Tree => {},
             Focus::SearchBar => {}
         }
     }
 
-    fn expand_tree(&mut self) {
-        self.tree_state.toggle_selected();
-    }
+    // fn expand_tree(&mut self) {
+    //     self.tree_state.toggle_selected();
+    // }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
@@ -297,8 +186,6 @@ impl App {
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(vlayout[0]);
-
-
 
         // let items: Vec<ListItem> = self
         //     .layer_names()
@@ -335,6 +222,10 @@ impl App {
 
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
+        // Test tree widget
+        let tree_widget = TreeBrowserWidget::new(&self.item.layers[0]);
+        frame.render_stateful_widget(tree_widget, hlayout[1], &mut self.tree_state);
+
         // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
         // let command = List::new(text)
         // .block(Block::default().borders(Borders::ALL).title("Command"));
@@ -342,21 +233,12 @@ impl App {
 
 
         // let current_layer = &self.item.layers[self.selected_layer];
-        // let items = App::construct_items(current_layer, &self.search_bar_content);
 
         // if self.tree_state.selected().len() == 0 {
         //     self.tree_state.select_first();
         // }
 
-        // let tree_widget = Tree::new(&items).expect("WTF")
-        // .block(Block::default().borders(Borders::ALL).title(tree_title))
-        // .highlight_style(
-        //         Style::default()
-        //         .bg(Color::Blue)
-        //         .fg(Color::White)
-        //         .add_modifier(Modifier::BOLD),
-        // )
-        // .highlight_symbol(">> ");
+
 
         // frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
 
@@ -460,7 +342,7 @@ impl App {
                         KeyCode::Down => self.next(), // Move selection down
                         KeyCode::Up => self.previous(), // Move selection up
                         KeyCode::Tab => self.circle_focus(), // Switch between list and tree
-                        KeyCode::Char(' ') => self.expand_tree(), // Expand tree
+                        // KeyCode::Char(' ') => self.expand_tree(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
                         KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => self.focus = Focus::SearchBar,
                     _ => {}

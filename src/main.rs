@@ -1,5 +1,6 @@
 mod docker_file_tree;
 mod docker_image_utils;
+mod widgets;
 mod gui_app;
 use docker_image_utils::ImageRepr;
 use gui_app::App;
