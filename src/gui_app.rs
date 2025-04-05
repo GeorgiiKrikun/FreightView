@@ -3,6 +3,7 @@ use crate::docker_image_utils::{
     ImageLayer, 
     ImageRepr
 };
+use crate::widgets::multitree_browser_widget::{MultiTreeBrowserWidget, MultiTreeBrowserWidgetState};
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
 use std::{
     collections::HashMap, 
@@ -45,6 +46,7 @@ use tui_tree_widget::{
     TreeItem, 
     TreeState
 };
+use crate::widgets::navigation_traits::Navigation;
 
 use ratatui::prelude::Widget;
 
@@ -75,7 +77,7 @@ fn prev_list_state(state : &mut ListState) {
 pub struct App {
     item: ImageRepr,
     exit: bool,
-    tree_state: TreeBrowserWidgetState,
+    tree_state: MultiTreeBrowserWidgetState,
     list_state: ListState,
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
@@ -99,17 +101,19 @@ impl App {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
 
-        App { 
+        let mut app = App { 
             item,
             exit: false,
-            layer_names,
+            layer_names: layer_names.clone(),
             layer_commands,
             n_layers,
             list_state,
             focus: Focus::List,
             search_bar_content: "".to_string(),
-            tree_state: TreeBrowserWidgetState::new(""),
-        }
+            tree_state: MultiTreeBrowserWidgetState::new("", &layer_names[..]),
+        };
+        app.adjust_tree_state_to_list();
+        return app;
 
     }
 
@@ -136,11 +140,19 @@ impl App {
         }
     }
 
+    fn adjust_tree_state_to_list(&mut self) {
+        let selected = self.list_state.selected().unwrap_or(0);
+        let selected_layer = &self.layer_names[selected];
+        self.tree_state.current_layer = selected_layer.to_string();
+    }
+
     fn next(&mut self) {
         match self.focus {
             
-            Focus::List => next_list_state(&mut self.list_state, self.n_layers),
-            // Focus::Tree => self.next_tree(),
+            Focus::List => {
+                ListState::next(&mut self.list_state, self.n_layers);
+                self.adjust_tree_state_to_list();
+            },
             Focus::Tree => {},
             Focus::SearchBar => {}
         }
@@ -154,8 +166,10 @@ impl App {
     
     fn previous(&mut self) {
         match self.focus {
-            Focus::List => prev_list_state(&mut self.list_state),
-            // Focus::Tree => self.previous_tree(),
+            Focus::List => {
+                ListState::prev(&mut self.list_state);
+                self.adjust_tree_state_to_list();
+            },
             Focus::Tree => {},
             Focus::SearchBar => {}
         }
@@ -221,8 +235,13 @@ impl App {
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
         // Test tree widget
-        let tree_widget = TreeBrowserWidget::new(&self.item.layers[0]);
+        let tree_widget = MultiTreeBrowserWidget::new( &self.item.layers[..]);
         frame.render_stateful_widget(tree_widget, hlayout[1], &mut self.tree_state);
+        
+
+
+
+        
 
         // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
         // let command = List::new(text)
