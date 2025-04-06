@@ -5,6 +5,7 @@ use crate::docker_image_utils::{
 };
 use crate::widgets::focus_traits::WidgetFocusTrait;
 use crate::widgets::multitree_browser_widget::{MultiTreeBrowserWidget, MultiTreeBrowserWidgetState};
+use crate::widgets::searchbar::{SearchBarWidget, SearchBarWidgetState};
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
 use std::{
     collections::HashMap, 
@@ -83,7 +84,7 @@ pub struct App {
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
     focus: Focus,
-    search_bar_content: String,
+    search_bar_state: SearchBarWidgetState,
 }
 
 impl App {
@@ -107,8 +108,8 @@ impl App {
             layer_commands,
             list_state: LayerBrowserWidgetState::new(),
             focus: Focus::List,
-            search_bar_content: "".to_string(),
             tree_state: MultiTreeBrowserWidgetState::new("", &layer_names[..]),
+            search_bar_state: SearchBarWidgetState::new(),
         };
         app.adjust_tree_state_to_list();
         return app;
@@ -251,10 +252,8 @@ impl App {
 
         // frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
 
-        // let search = Paragraph::new(self.search_bar_content.clone())
-        //     .block(Block::default()
-        //     .borders(Borders::ALL)
-        //     .title(search_title));
+        let search = SearchBarWidget::new();
+        frame.render_stateful_widget(search, vlayout[1], &mut self.search_bar_state);
 
         // frame.render_widget(search, vlayout[1]);
         // // frame.render_widget(Clear, frame.area());
@@ -332,16 +331,18 @@ impl App {
                 Focus::SearchBar => {
                     match key_event.code {
                         KeyCode::Char(c) => {
-                            self.search_bar_content.push(c);
+                            self.search_bar_state.push_c(c);
                         }
                         KeyCode::Backspace => {
-                            self.search_bar_content.pop();
+                            self.search_bar_state.pop_c();
                         }
                         KeyCode::Enter => {
                             self.focus = Focus::Tree;
                         }
                         KeyCode::Esc => {
-                            self.focus = Focus::Tree;
+                            self.search_bar_state.focus_on(false);
+                            self.list_state.focus_on(true);
+                            self.focus = Focus::List;
                         }
                         _ => {}
                     }
@@ -353,7 +354,11 @@ impl App {
                         KeyCode::Tab => self.circle_focus(), // Switch between list and tree
                         KeyCode::Char(' ') => self.tree_state.expand(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
-                        KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => self.focus = Focus::SearchBar,
+                        KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            self.deselect_all();
+                            self.search_bar_state.focus_on(true);
+                            self.focus = Focus::SearchBar
+                        },
                     _ => {}
                 }
             }
