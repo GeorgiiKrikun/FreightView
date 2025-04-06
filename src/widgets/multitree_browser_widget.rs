@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use ratatui::widgets::{Block, Borders, Widget};
 use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
-use tui_tree_widget::TreeState;
 
 use crate::docker_image_utils::ImageLayer;
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
@@ -35,7 +34,7 @@ impl MultiTreeBrowserWidgetState {
     }
     
     pub fn expand(&mut self) {
-        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        let cur_selected_state = self.tree_states.get_mut(&self.current_layer);
         if let Some(selected_state) = cur_selected_state {
             selected_state.expand();
         } else {
@@ -69,7 +68,7 @@ impl WidgetFocusTrait for MultiTreeBrowserWidgetState {
 
 impl WidgetNav for MultiTreeBrowserWidgetState {
     fn next(&mut self) {
-        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        let cur_selected_state = self.tree_states.get_mut(&self.current_layer);
         if let Some(selected_state) = cur_selected_state {
             // selected_state.select_relative(|current| {
                 // current.map_or(0, |current| current.saturating_add(1))
@@ -81,11 +80,8 @@ impl WidgetNav for MultiTreeBrowserWidgetState {
     }
 
     fn prev(&mut self) {
-        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        let cur_selected_state = self.tree_states.get_mut(&self.current_layer);
         if let Some(selected_state) = cur_selected_state {
-            // selected_state.select_relative(|current| {
-                // current.map_or(0, |current| current.saturating_add(1))
-            // });
             selected_state.prev();
         } else {
             return;

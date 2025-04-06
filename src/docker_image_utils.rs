@@ -172,7 +172,7 @@ impl ImageRepr {
         let manifest_file = get_manifest_config_file(&img_folder);
         let mut commands = get_layer_commands(&img_folder, &manifest_file);
         
-        if (commands.len() != layer_trees.len()) {
+        if commands.len() != layer_trees.len() {
             print!("Commands and layers size mismatch; commands won't be printed");
             commands.clear();
             commands.resize(layer_trees.len(), String::from("Not available"));
@@ -318,6 +318,7 @@ pub fn get_layer_commands(docker_root_folder: &PathBuf, config_file : &str) -> V
     commands
 }
 
+#[allow(dead_code, non_snake_case)]
 #[derive(Debug, Deserialize)]
 struct Manifest {
     Config: String,
@@ -326,6 +327,7 @@ struct Manifest {
     LayerSources: Option<HashMap<String, LayerSource>>,
 }
 
+#[allow(dead_code, non_snake_case)]
 #[derive(Debug, Deserialize)]
 struct LayerSource {
     mediaType: String,
@@ -338,6 +340,7 @@ struct Config {
     history: Vec<History>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct History {
     created: String,
@@ -348,7 +351,7 @@ struct History {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::remove_dir_all;
+    
 
     const DOCKER_FOLDER_PATH: &str = "test-docker-tar/";
 

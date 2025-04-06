@@ -156,7 +156,7 @@ impl App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(vlayout[0]);
 
-        let mut layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
+        let layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
 
         layers_and_commands.ensure_bounds(&mut self.list_state);
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);

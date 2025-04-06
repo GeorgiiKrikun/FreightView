@@ -1,10 +1,8 @@
 
 
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{Block, Borders, List, ListState, Paragraph, StatefulWidget, Widget};
-use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
+use ratatui::layout::Rect;
+use ratatui::widgets::{Block, Borders, Paragraph, StatefulWidget, Widget};
 
 use super::focus_traits::WidgetFocusTrait;
 

@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::{
     collections::VecDeque, 
     path::PathBuf
@@ -8,7 +7,6 @@ use serde::{
     Deserialize, 
     Serialize
 };
-use tui_tree_widget::Tree;
 
 #[derive(Clone,Serialize,Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
@@ -66,7 +64,7 @@ impl TreeNode {
     }
 
     pub fn prettyfy(mut self) -> TreeNode {
-        let mut out_node : TreeNode;
+        let out_node : TreeNode;
         if self.kids.len() == 1 {
             let mut kid = self.kids.remove(0);
             if kid.path == PathBuf::from("") {
@@ -155,12 +153,12 @@ impl TreeNode {
         let mut current : &mut TreeNode = &mut out;
         // last search string should be taken care separately as it should not filter when the path is not 
         // yet fully typed
-        for d in (0..filter.len() - 1) {
+        for d in 0..filter.len() - 1 {
             let subfilter : &str = filter[d];
             let mut next_ind : Option<usize> = None;
             let current_nkids = current.kids.len();
 
-            for i in (0..current_nkids) {
+            for i in 0..current_nkids {
                 if current.kids()[i].path().file_name().unwrap() == subfilter {
                     next_ind = Some(i);
                     break;
@@ -189,7 +187,7 @@ impl TreeNode {
         let subfilter : &str = filter[filter.len() - 1];
         let mut inds : Vec<usize> = Vec::new();
         let current_nkids: usize = current.kids.len();
-        for i in (0..current_nkids) {
+        for i in 0..current_nkids {
             if current.kids()[i].path().file_name().unwrap().to_str().unwrap().starts_with(subfilter) {
                 inds.push(i);
             }
@@ -411,7 +409,7 @@ mod tests {
             "File</subtest2/subsubtest2/subsubfile2>: Add",
         ];
 
-        for i in (0..outputs.len()) {
+        for i in 0..outputs.len() {
             assert_eq!(out[i].trim(), outputs[i]);
         }
 
