@@ -3,6 +3,7 @@ use crate::docker_image_utils::{
     ImageLayer, 
     ImageRepr
 };
+use crate::widgets::focus_traits::WidgetFocusTrait;
 use crate::widgets::multitree_browser_widget::{MultiTreeBrowserWidget, MultiTreeBrowserWidgetState};
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
 use std::{
@@ -50,7 +51,7 @@ use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
 
 use ratatui::prelude::Widget;
 
-use crate::widgets::layer_browser_widget::{self, LayerBrowserWidget};
+use crate::widgets::layer_browser_widget::{self, LayerBrowserWidget, LayerBrowserWidgetState};
 
 enum Focus {
     List,
@@ -78,7 +79,7 @@ pub struct App {
     item: ImageRepr,
     exit: bool,
     tree_state: MultiTreeBrowserWidgetState,
-    list_state: ListState,
+    list_state: LayerBrowserWidgetState,
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
     focus: Focus,
@@ -104,7 +105,7 @@ impl App {
             exit: false,
             layer_names: layer_names.clone(),
             layer_commands,
-            list_state,
+            list_state: LayerBrowserWidgetState::new(),
             focus: Focus::List,
             search_bar_content: "".to_string(),
             tree_state: MultiTreeBrowserWidgetState::new("", &layer_names[..]),
@@ -122,11 +123,23 @@ impl App {
         self.item.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
+    fn deselect_all(&mut self) {
+        self.list_state.focus_on(false);
+        self.tree_state.focus_on(false);
+    }
 
     fn circle_focus(&mut self) {
         match self.focus {
-            Focus::List => self.focus = Focus::Tree,
-            Focus::Tree => self.focus = Focus::List,
+            Focus::List => {
+                self.deselect_all();
+                self.tree_state.focus_on(true);
+                self.focus = Focus::Tree;
+            },
+            Focus::Tree => {
+                self.deselect_all();
+                self.list_state.focus_on(true); 
+                self.focus = Focus::List;                
+            },
             Focus::SearchBar => {}
         }
     }
@@ -193,16 +206,6 @@ impl App {
         //     .map(|i| ListItem::new(Span::from(i.clone())))
         //     .collect();
 
-        let list_title = match self.focus {
-            Focus::List => "😍 Layers ",
-            _ => "Layers",
-        };
-
-        let tree_title = match self.focus {
-            Focus::Tree => "😍 Tree",
-            _ => "Tree",
-        };
-
         let search_title = match self.focus {
             Focus::SearchBar => "😍 Search",
             _ => "Search",
@@ -218,7 +221,8 @@ impl App {
         // )
         // .highlight_symbol(">> ");
 
-        let layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
+        let mut layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
+
         layers_and_commands.ensure_bounds(&mut self.list_state);
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 

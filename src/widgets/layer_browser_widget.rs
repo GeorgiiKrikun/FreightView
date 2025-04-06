@@ -4,6 +4,14 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListState, Paragraph, StatefulWidget, Widget};
 use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
 
+use super::focus_traits::WidgetFocusTrait;
+
+pub struct LayerBrowserWidgetState {
+    title: String,
+    is_toggled: bool,
+    pub state: ListState,
+}
+
 pub struct LayerBrowserWidget<'a> {
     layer_names: &'a Vec<String>,
     layer_commands: &'a Vec<String>,
@@ -12,11 +20,30 @@ pub struct LayerBrowserWidget<'a> {
 impl<'a> LayerBrowserWidget<'a> {
     pub fn new(layer_names: &'a Vec<String>, layer_commands: &'a Vec<String> ) -> Self {
         Self { layer_names, 
-               layer_commands }
+               layer_commands,
+            }
     }
 }
 
-impl WidgetNav for ListState {
+impl LayerBrowserWidgetState {
+    pub fn new() -> Self {
+        LayerBrowserWidgetState {
+            title: "Layer Browser".to_string(),
+            is_toggled: true,
+            state: ListState::default(),
+        }
+    }
+
+    pub fn select(&mut self, index: Option<usize>) {
+        self.state.select(index);
+    }
+
+    pub fn selected(&self) -> Option<usize> {
+        self.state.selected()
+    }
+}
+
+impl WidgetNav for LayerBrowserWidgetState {
     fn next(&mut self) {
         if let Some(selected) = self.selected() {
                 self.select(Some(selected + 1));
@@ -36,21 +63,36 @@ impl WidgetNav for ListState {
     }
 }
 
-impl<'a> WidgetNavBounds<ListState> for LayerBrowserWidget<'a> {
-    fn ensure_bounds(&self, state: &mut ListState) {
+impl<'a> WidgetNavBounds<LayerBrowserWidgetState> for LayerBrowserWidget<'a> {
+    fn ensure_bounds(&self, state: &mut LayerBrowserWidgetState) {
         let max = self.layer_names.len();
-        if let Some(selected) = state.selected() {
+        if let Some(selected) = state.state.selected() {
             if selected >= max {
-                state.select(Some(max - 1));
+                state.state.select(Some(max - 1));
             }
-            // the < 0 case is handled by the prev() method, since it might lead to integer overflow
         }
     }
 
 }
 
+impl WidgetFocusTrait for LayerBrowserWidgetState {
+    fn focus_on(&mut self, selected: bool) {
+        self.is_toggled = selected;
+        if self.is_toggled {
+            self.title = "😍 Layer Browser".to_string();
+        } else {
+            self.title = "Layer Browser".to_string();
+        }
+    }
+
+    fn is_focused(&self) -> bool {
+        self.is_toggled
+    }
+
+}
+
 impl<'a> StatefulWidget for LayerBrowserWidget<'a> {
-    type State = ListState;
+    type State = LayerBrowserWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State){ 
         let layout = Layout::default()
@@ -60,7 +102,7 @@ impl<'a> StatefulWidget for LayerBrowserWidget<'a> {
         
         // Create the List widget
         let list = List::new(self.layer_names.clone())
-        .block(Block::default().borders(Borders::ALL).title("Layers"))
+        .block(Block::default().borders(Borders::ALL).title(state.title.clone()))
         .highlight_style(
             Style::default()
                 .bg(Color::Blue)
@@ -70,12 +112,12 @@ impl<'a> StatefulWidget for LayerBrowserWidget<'a> {
         .highlight_symbol(">> ");
 
         // Render the List widget with its state
-        StatefulWidget::render(list, layout[0], buf, state);
+        StatefulWidget::render(list, layout[0], buf, &mut state.state);
 
 
 
         // Create the Command widget
-        let command :Paragraph = Paragraph::new(self.layer_commands[state.selected().unwrap_or(0)].clone())
+        let command :Paragraph = Paragraph::new(self.layer_commands[state.state.selected().unwrap_or(0)].clone())
         .block(Block::default().borders(Borders::ALL).title("Command"))
         .wrap(ratatui::widgets::Wrap { trim: true });
         

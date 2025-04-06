@@ -135,7 +135,6 @@ impl<'a> StatefulWidget for TreeBrowserWidget<'a> {
         let items = construct_items(self.corresponding_layer, &state.search_string);
 
         let tree_widget = Tree::new(&items).expect("WTF")
-        .block(Block::default().borders(Borders::ALL).title("Tree"))
         .highlight_style(
                 Style::default()
                 .bg(Color::Blue)

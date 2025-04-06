@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ratatui::widgets::{Block, Borders, Widget};
 use ratatui::{buffer::Buffer, layout::Rect, widgets::StatefulWidget};
 use tui_tree_widget::TreeState;
 
@@ -7,9 +8,13 @@ use crate::docker_image_utils::ImageLayer;
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
 use crate::widgets::navigation_traits::WidgetNav;
 
+use crate::widgets::focus_traits::WidgetFocusTrait;
+
 pub struct MultiTreeBrowserWidgetState {
     pub search_string: String,
     pub current_layer: String,
+    title: String,
+    is_toggled: bool,
     tree_states: HashMap<String, TreeBrowserWidgetState >,
 }
 
@@ -24,6 +29,8 @@ impl MultiTreeBrowserWidgetState {
             search_string: search_string.to_string(),
             tree_states: tree_states,
             current_layer: "".to_string(),
+            title: "Filetree Browser".to_string(),
+            is_toggled: false,
         }
     }
     
@@ -36,6 +43,22 @@ impl MultiTreeBrowserWidgetState {
         }
     }
 } 
+
+impl WidgetFocusTrait for MultiTreeBrowserWidgetState {
+    fn focus_on(&mut self, selected: bool) {
+        self.is_toggled = selected;
+        if selected {
+            self.title = "😍 Filetree Browser".to_string();
+        } else {
+            self.title = "Filetree Browser".to_string();
+        }
+    }
+
+    fn is_focused(&self) -> bool {
+        self.is_toggled
+    }
+
+}
 
 impl WidgetNav for MultiTreeBrowserWidgetState {
     fn next(&mut self) {
@@ -94,6 +117,15 @@ impl<'a> StatefulWidget for MultiTreeBrowserWidget<'a> {
         let &cur_tree_layer = self.tree_layers.get(cur_layer).expect("Can't find current layer in widget");
         let tree_widget = TreeBrowserWidget::new(cur_tree_layer);
 
-        StatefulWidget::render(tree_widget, area, buf, cur_tree_state);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(state.title.clone());        
+        let inner_area = block.inner(area);
+
+        block.render(area, buf);
+
+
+
+        StatefulWidget::render(tree_widget, inner_area, buf, cur_tree_state);
     }
 }
