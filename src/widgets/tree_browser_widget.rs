@@ -97,6 +97,10 @@ impl TreeBrowserWidgetState {
         let mut selected_state = &mut self.tree_state;
         selected_state.toggle_selected();
     }
+
+    pub fn set_search_string(&mut self, search_string: &str) {
+        self.search_string = search_string.to_string();
+    }
 }
 
 pub struct TreeBrowserWidget<'a> {

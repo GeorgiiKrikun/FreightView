@@ -40,6 +40,10 @@ impl SearchBarWidgetState {
     pub fn pop_c(&mut self) {
         self.search_string.pop();
     }
+
+    pub fn get(&self) -> String {
+        self.search_string.clone()
+    }
 }
 
 impl WidgetFocusTrait for SearchBarWidgetState {

@@ -42,6 +42,13 @@ impl MultiTreeBrowserWidgetState {
             return;
         }
     }
+
+    pub fn set_search_string(&mut self, search_string: &str) {
+        self.search_string = search_string.to_string();
+        for (_, state) in self.tree_states.iter_mut() {
+            state.set_search_string(search_string);
+        }
+    }
 } 
 
 impl WidgetFocusTrait for MultiTreeBrowserWidgetState {

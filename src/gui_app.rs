@@ -154,6 +154,11 @@ impl App {
         self.tree_state.current_layer = selected_layer.to_string();
     }
 
+    fn adjust_tree_state_to_search_bar_content(&mut self) {
+        let search_string = self.search_bar_state.get();
+        self.tree_state.set_search_string(&search_string);
+    }
+
     fn next(&mut self) {
         match self.focus {
             
@@ -332,9 +337,11 @@ impl App {
                     match key_event.code {
                         KeyCode::Char(c) => {
                             self.search_bar_state.push_c(c);
+                            self.adjust_tree_state_to_search_bar_content();
                         }
                         KeyCode::Backspace => {
                             self.search_bar_state.pop_c();
+                            self.adjust_tree_state_to_search_bar_content();
                         }
                         KeyCode::Enter => {
                             self.focus = Focus::Tree;
