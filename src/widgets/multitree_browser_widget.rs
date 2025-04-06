@@ -5,6 +5,7 @@ use tui_tree_widget::TreeState;
 
 use crate::docker_image_utils::ImageLayer;
 use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
+use crate::widgets::navigation_traits::WidgetNav;
 
 pub struct MultiTreeBrowserWidgetState {
     pub search_string: String,
@@ -25,7 +26,42 @@ impl MultiTreeBrowserWidgetState {
             current_layer: "".to_string(),
         }
     }
+    
+    pub fn expand(&mut self) {
+        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        if let Some(selected_state) = cur_selected_state {
+            selected_state.expand();
+        } else {
+            return;
+        }
+    }
 } 
+
+impl WidgetNav for MultiTreeBrowserWidgetState {
+    fn next(&mut self) {
+        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        if let Some(selected_state) = cur_selected_state {
+            // selected_state.select_relative(|current| {
+                // current.map_or(0, |current| current.saturating_add(1))
+            // });
+            selected_state.next();
+        } else {
+            return;
+        }
+    }
+
+    fn prev(&mut self) {
+        let mut cur_selected_state = self.tree_states.get_mut(&self.current_layer);
+        if let Some(selected_state) = cur_selected_state {
+            // selected_state.select_relative(|current| {
+                // current.map_or(0, |current| current.saturating_add(1))
+            // });
+            selected_state.prev();
+        } else {
+            return;
+        }
+    }
+}
 
 pub struct MultiTreeBrowserWidget<'a> {
     tree_layers: HashMap<String, &'a ImageLayer >,

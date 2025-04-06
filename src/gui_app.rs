@@ -81,7 +81,6 @@ pub struct App {
     list_state: ListState,
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
-    n_layers: usize,
     focus: Focus,
     search_bar_content: String,
 }
@@ -96,7 +95,6 @@ impl App {
         if layer_names.len() != layer_commands.len() {
             panic!("Layer names and commands are not the same length");
         }
-        let n_layers = layer_names.len();
 
         let mut list_state = ListState::default();
         list_state.select(Some(0));
@@ -106,7 +104,6 @@ impl App {
             exit: false,
             layer_names: layer_names.clone(),
             layer_commands,
-            n_layers,
             list_state,
             focus: Focus::List,
             search_bar_content: "".to_string(),
@@ -125,12 +122,6 @@ impl App {
         self.item.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
-    
-    // fn next_tree(&mut self) {
-    //     self.tree_state.select_relative(|current| {
-    //         current.map_or(0, |current| current.saturating_add(1))
-    //     });
-    // }
 
     fn circle_focus(&mut self) {
         match self.focus {
@@ -156,16 +147,12 @@ impl App {
                 self.list_state.next();
                 self.adjust_tree_state_to_list();
             },
-            Focus::Tree => {},
+            Focus::Tree => {
+                self.tree_state.next();
+            },
             Focus::SearchBar => {}
         }
     }
-
-    // fn previous_tree(&mut self) {
-    //     self.tree_state.select_relative(|current| {
-    //         current.map_or(0, |current| current.saturating_sub(1))
-    //     });
-    // }
     
     fn previous(&mut self) {
         match self.focus {
@@ -173,14 +160,12 @@ impl App {
                 self.list_state.prev();
                 self.adjust_tree_state_to_list();
             },
-            Focus::Tree => {},
+            Focus::Tree => {
+                self.tree_state.prev();
+            },
             Focus::SearchBar => {}
         }
     }
-
-    // fn expand_tree(&mut self) {
-    //     self.tree_state.toggle_selected();
-    // }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
@@ -362,7 +347,7 @@ impl App {
                         KeyCode::Down => self.next(), // Move selection down
                         KeyCode::Up => self.previous(), // Move selection up
                         KeyCode::Tab => self.circle_focus(), // Switch between list and tree
-                        // KeyCode::Char(' ') => self.expand_tree(), // Expand tree
+                        KeyCode::Char(' ') => self.tree_state.expand(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
                         KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => self.focus = Focus::SearchBar,
                     _ => {}

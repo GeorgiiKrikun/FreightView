@@ -92,22 +92,12 @@ impl TreeBrowserWidgetState {
             tree_state: TreeState::default(),
         }
     }
+
+    pub fn expand(&mut self) {
+        let mut selected_state = &mut self.tree_state;
+        selected_state.toggle_selected();
+    }
 }
-
-// impl WidgetNavigation for TreeBrowserWidgetState {
-//     fn next(&mut self, max: usize) {
-//         if let Some(selected) = self.tree_state.selected() {
-//             if selected < max - 1 {
-//                 self.tree_state.select(Some(selected + 1));
-//             }
-//         } else {
-//             self.tree_state.select(Some(0));
-//         }        
-//     }
-
-    
-//     }
-// }
 
 pub struct TreeBrowserWidget<'a> {
     corresponding_layer: &'a ImageLayer,
@@ -120,6 +110,23 @@ impl<'a> TreeBrowserWidget<'a> {
         }
     }
 }
+
+impl WidgetNav for TreeBrowserWidgetState {
+    fn next(&mut self) {
+        let mut selected_state = &mut self.tree_state;
+        selected_state.select_relative(|current| {
+            current.map_or(0, |current| current.saturating_add(1))
+        });
+    }
+
+    fn prev(&mut self) {
+        let mut selected_state = &mut self.tree_state;
+        selected_state.select_relative(|current| {
+            current.map_or(0, |current| current.saturating_sub(1))
+        });
+    }
+}
+
 
 impl<'a> StatefulWidget for TreeBrowserWidget<'a> {
     type State = TreeBrowserWidgetState;
