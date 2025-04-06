@@ -1,38 +1,16 @@
-use crate::docker_file_tree::{FileOp, TreeNode};
-use crate::docker_image_utils::{
-    ImageLayer, 
-    ImageRepr
-};
+use crate::docker_image_utils::ImageRepr;
 use crate::widgets::focus_traits::WidgetFocusTrait;
 use crate::widgets::multitree_browser_widget::{MultiTreeBrowserWidget, MultiTreeBrowserWidgetState};
 use crate::widgets::searchbar::{SearchBarWidget, SearchBarWidgetState};
-use crate::widgets::tree_browser_widget::{TreeBrowserWidget, TreeBrowserWidgetState};
-use std::{
-    collections::HashMap, 
-    time::Duration, 
-};
+use std::time::Duration;
 use std::io;
-use ratatui::text::Text;
-use ratatui::widgets::{Clear, Paragraph, StatefulWidget};
 use ratatui::{
     layout::{
         Constraint, 
         Direction, 
         Layout
     }, 
-    style::{
-        Color, 
-        Modifier, 
-        Style
-    }, 
-    text::Span, 
-    widgets::{
-        Block, 
-        Borders, 
-        List, 
-        ListItem, 
-        ListState, 
-    }, 
+    widgets::ListState, 
     DefaultTerminal, 
     Frame
 };
@@ -42,38 +20,14 @@ use crossterm::event::{
     KeyCode, 
     KeyEvent
 };
-
-use tui_tree_widget::{
-    Tree, 
-    TreeItem, 
-    TreeState
-};
 use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
 
-use ratatui::prelude::Widget;
-
-use crate::widgets::layer_browser_widget::{self, LayerBrowserWidget, LayerBrowserWidgetState};
+use crate::widgets::layer_browser_widget::{LayerBrowserWidget, LayerBrowserWidgetState};
 
 enum Focus {
     List,
     Tree,
     SearchBar,
-}
-
-fn next_list_state(state : &mut ListState, size : usize) {
-    if let Some(selected) = state.selected() {
-        if selected < size - 1 {
-            state.select(Some(selected + 1));
-        }
-    }
-}
-
-fn prev_list_state(state : &mut ListState) {
-    if let Some(selected) = state.selected() {
-        if selected > 0 {
-            state.select(Some(selected - 1));
-        }
-    }
 }
 
 pub struct App {
@@ -118,10 +72,6 @@ impl App {
 
     fn layer_names_from_img(img : &ImageRepr) -> Vec<String> {
         img.layers.iter().map(|layer| layer.name.clone()).collect()
-    }
-
-    fn layer_names(&self) -> Vec<String> {
-        self.item.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
     fn deselect_all(&mut self) {
