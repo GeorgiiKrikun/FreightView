@@ -156,107 +156,16 @@ impl App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
             .split(vlayout[0]);
 
-        // let items: Vec<ListItem> = self
-        //     .layer_names()
-        //     .iter()
-        //     .map(|i| ListItem::new(Span::from(i.clone())))
-        //     .collect();
-
-        let search_title = match self.focus {
-            Focus::SearchBar => "😍 Search",
-            _ => "Search",
-        };
-
-        // let list = List::new(items)
-        // .block(Block::default().borders(Borders::ALL).title(list_title))
-        // .highlight_style(
-        //     Style::default()
-        //         .bg(Color::Blue)
-        //         .fg(Color::White)
-        //         .add_modifier(Modifier::BOLD),
-        // )
-        // .highlight_symbol(">> ");
-
         let mut layers_and_commands = LayerBrowserWidget::new(&self.layer_names, &self.layer_commands);
 
         layers_and_commands.ensure_bounds(&mut self.list_state);
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
-        // Test tree widget
         let tree_widget = MultiTreeBrowserWidget::new( &self.item.layers[..]);
         frame.render_stateful_widget(tree_widget, hlayout[1], &mut self.tree_state);
         
-
-
-
-        
-
-        // let text = App::split_string_into_vec(self.get_layer_command(), vlayout_left[1].width as usize - 10);
-        // let command = List::new(text)
-        // .block(Block::default().borders(Borders::ALL).title("Command"));
-
-
-
-        // let current_layer = &self.item.layers[self.selected_layer];
-
-        // if self.tree_state.selected().len() == 0 {
-        //     self.tree_state.select_first();
-        // }
-
-
-
-        // frame.render_stateful_widget(tree_widget, hlayout[1], & mut self.tree_state);
-
         let search = SearchBarWidget::new();
         frame.render_stateful_widget(search, vlayout[1], &mut self.search_bar_state);
-
-        // frame.render_widget(search, vlayout[1]);
-        // // frame.render_widget(Clear, frame.area());
-
-    }
-
-    fn split_string_into_size(s: &str, size: usize) -> String {
-        let mut res = String::default();
-        if (s.len() <= size) {
-            return s.to_string();
-        }
-        let mut current_pos = 0;
-        while current_pos < s.len() - size {
-            res.push_str(&s[current_pos..current_pos + size]);
-            res.push('\n');
-            current_pos += size;
-        }
-
-        res.push_str(&s[current_pos..s.len()]);
-        return res;
-    }
-
-    fn split_string_into_vec(s: &str, size: usize) -> Vec<String> {
-        let mut res = Vec::new();
-        let mut current_pos = 0;
-        let mut s = s.to_string();
-        s.retain(|c| !c.is_control());
-
-        if (s.len() <= size) {
-            return vec![s.to_string()];
-        }
-        while current_pos < s.len() - size {
-            res.push(s[current_pos..current_pos + size].to_string());
-            current_pos += size;
-        }
-
-        res.push(s[current_pos..s.len()].to_string());
-        return res;
-    }
-
-    fn remove_control_chars_from_string(s: &str) -> String {
-        let mut res = String::default();
-        for c in s.chars() {
-            if !c.is_control() {
-                res.push(c);
-            }
-        }
-        res
     }
 
     fn get_all_key_events() -> Vec<KeyEvent> {
