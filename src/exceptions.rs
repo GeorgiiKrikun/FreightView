@@ -1,10 +1,8 @@
 use bollard::errors::Error as DockerError;
-use std::io::Error;
-use thiserror::Error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImageParcingError {
-    ImageNotFound,
+    //CantDownloadImage,
     CantGetAHomeDir,
     FilesystemError,
     JSONError,
@@ -19,19 +17,19 @@ impl std::fmt::Display for ImageParcingError {
 }
 
 impl From<std::io::Error> for ImageParcingError {
-    fn from(err: std::io::Error) -> ImageParcingError {
+    fn from(_err: std::io::Error) -> ImageParcingError {
         ImageParcingError::FilesystemError
     }
 }
 
 impl From<serde_json::Error> for ImageParcingError {
-    fn from(err: serde_json::Error) -> ImageParcingError {
+    fn from(_err: serde_json::Error) -> ImageParcingError {
         ImageParcingError::JSONError
     }
 }
 
 impl From<DockerError> for ImageParcingError {
-    fn from(err: DockerError) -> ImageParcingError {
+    fn from(_err: DockerError) -> ImageParcingError {
         ImageParcingError::DockerAPIError
     }
 }

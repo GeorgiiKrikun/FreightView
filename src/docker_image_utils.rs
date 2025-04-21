@@ -159,7 +159,7 @@ impl ImageRepr {
 
         println!("Missing some layers in the cache, need to redownload the image");
 
-        download_image_file(&docker, &name, &img_tar_file_path).await;
+        download_image_file(&docker, &name, &img_tar_file_path).await?;
 
         // Untar image
         let file: File = File::open(&img_tar_file_path).expect("Can't open file");
@@ -192,7 +192,7 @@ impl ImageRepr {
         for ((layer_name, layer_tree), command) in layer_trees.into_iter().zip(commands.into_iter())
         {
             let layer = ImageLayer::new(layer_name, layer_tree, command);
-            layer.save();
+            layer.save()?;
         }
 
         // Finally, load all layers from cache
