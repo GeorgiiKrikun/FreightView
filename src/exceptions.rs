@@ -2,12 +2,13 @@ use bollard::errors::Error as DockerError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImageParcingError {
-    //CantDownloadImage,
+    CantDownloadImage,
     CantGetAHomeDir,
     FilesystemError,
     JSONError,
     DockerAPIError,
     LayerParsingError,
+    NonUnixFileSystem,
 }
 
 impl std::fmt::Display for ImageParcingError {

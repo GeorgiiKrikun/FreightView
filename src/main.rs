@@ -1,6 +1,8 @@
 mod docker_file_tree;
 mod docker_image_utils;
 mod exceptions;
+mod file_tree;
+mod file_tree_node;
 mod gui_app;
 mod widgets;
 use bollard::Docker;
