@@ -1,19 +1,13 @@
-use std::{
-    collections::VecDeque, 
-    path::PathBuf
-};
+use serde::{Deserialize, Serialize};
 use std::fs::FileType;
-use serde::{
-    Deserialize, 
-    Serialize
-};
+use std::{collections::VecDeque, path::PathBuf};
 
-#[derive(Clone,Serialize,Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
     Directory,
     File,
     Symlink,
-    Badfile
+    Badfile,
 }
 
 impl DDiveFileType {
@@ -25,7 +19,7 @@ impl DDiveFileType {
         } else if ftype.is_symlink() {
             DDiveFileType::Symlink
         } else {
-           DDiveFileType::Badfile
+            DDiveFileType::Badfile
         }
     }
 }
@@ -34,7 +28,7 @@ impl DDiveFileType {
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum FileOp {
     Add,
-    Remove
+    Remove,
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
@@ -46,7 +40,7 @@ pub struct TreeNode {
 }
 
 impl TreeNode {
-    pub fn new(ftype : &DDiveFileType, fop: &FileOp, path: &PathBuf) -> TreeNode {
+    pub fn new(ftype: &DDiveFileType, fop: &FileOp, path: &PathBuf) -> TreeNode {
         TreeNode {
             path: path.clone(),
             ftype: ftype.clone(),
@@ -56,7 +50,7 @@ impl TreeNode {
     }
 
     pub fn kids(&self) -> Vec<&TreeNode> {
-        let mut vec : Vec<&TreeNode> = Vec::new();
+        let mut vec: Vec<&TreeNode> = Vec::new();
         for kid in &self.kids {
             vec.push(kid);
         }
@@ -64,7 +58,7 @@ impl TreeNode {
     }
 
     pub fn prettyfy(mut self) -> TreeNode {
-        let out_node : TreeNode;
+        let out_node: TreeNode;
         if self.kids.len() == 1 {
             let mut kid = self.kids.remove(0);
             if kid.path == PathBuf::from("") {
@@ -72,12 +66,13 @@ impl TreeNode {
             }
             out_node = kid;
         } else {
-            println!("Prettyfying node with {} children is not feasible", self.kids.len());
+            println!(
+                "Prettyfying node with {} children is not feasible",
+                self.kids.len()
+            );
             out_node = self;
         }
-
         out_node
-
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -100,7 +95,7 @@ impl TreeNode {
     }
 
     pub fn breadth_first(&self) -> Vec<&TreeNode> {
-        let mut nodes : Vec<&TreeNode> = Vec::new();
+        let mut nodes: Vec<&TreeNode> = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back(self);
         while !queue.is_empty() {
@@ -119,7 +114,7 @@ impl TreeNode {
     }
 
     #[allow(dead_code)]
-    pub fn print_tree(&self, depth: usize, output : &mut String) {
+    pub fn print_tree(&self, depth: usize, output: &mut String) {
         let mut indent = String::new();
         for _ in 0..depth {
             indent.push_str("  ");
@@ -135,27 +130,30 @@ impl TreeNode {
             FileOp::Remove => "Remove",
         };
         let path_str = self.path.to_str().unwrap();
-        output.push_str(&format!("{}{}<{}>: {}\n", indent, ftype_str, path_str, fop_str));
+        output.push_str(&format!(
+            "{}{}<{}>: {}\n",
+            indent, ftype_str, path_str, fop_str
+        ));
         // println!("{}{}<{}>: {}", indent, ftype_str, path_str, fop_str);
         for kid in &self.kids {
             kid.print_tree(depth + 1, output);
         }
     }
-    
+
     pub fn filter_tree_full_path(&self, filter: &str) -> Option<TreeNode> {
-        let filter : Vec<&str> = filter.split("/").collect();
+        let filter: Vec<&str> = filter.split("/").collect();
         // clean up empty strings
-        let filter : Vec<&str> = filter.iter().filter(|&x| x != &"").map(|x| *x).collect();
+        let filter: Vec<&str> = filter.iter().filter(|&x| x != &"").map(|x| *x).collect();
         if filter.len() == 0 {
             return None;
         }
-        let mut out : TreeNode = self.clone();
-        let mut current : &mut TreeNode = &mut out;
-        // last search string should be taken care separately as it should not filter when the path is not 
+        let mut out: TreeNode = self.clone();
+        let mut current: &mut TreeNode = &mut out;
+        // last search string should be taken care separately as it should not filter when the path is not
         // yet fully typed
         for d in 0..filter.len() - 1 {
-            let subfilter : &str = filter[d];
-            let mut next_ind : Option<usize> = None;
+            let subfilter: &str = filter[d];
+            let mut next_ind: Option<usize> = None;
             let current_nkids = current.kids.len();
 
             for i in 0..current_nkids {
@@ -164,7 +162,6 @@ impl TreeNode {
                     break;
                 }
             }
-            
 
             match next_ind {
                 Some(n) => {
@@ -184,11 +181,18 @@ impl TreeNode {
         }
 
         // Parse the last string after / to filter the last node
-        let subfilter : &str = filter[filter.len() - 1];
-        let mut inds : Vec<usize> = Vec::new();
+        let subfilter: &str = filter[filter.len() - 1];
+        let mut inds: Vec<usize> = Vec::new();
         let current_nkids: usize = current.kids.len();
         for i in 0..current_nkids {
-            if current.kids()[i].path().file_name().unwrap().to_str().unwrap().starts_with(subfilter) {
+            if current.kids()[i]
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with(subfilter)
+            {
                 inds.push(i);
             }
         }
@@ -197,23 +201,19 @@ impl TreeNode {
             return None;
         }
 
-        let mut new_kids : Vec<TreeNode> = Vec::new();
+        let mut new_kids: Vec<TreeNode> = Vec::new();
         for i in inds {
             new_kids.push(current.kids[i].clone());
         }
 
         current.kids = new_kids;
-            
 
         Some(out)
-        
-
     }
-
 }
 
 // Parse directory into tree
-pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &mut TreeNode) {
+pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent: &mut TreeNode) {
     let rel_path = PathBuf::from(path.strip_prefix(main_path).unwrap());
     let metadata = std::fs::metadata(&path);
     if metadata.is_err() {
@@ -224,23 +224,18 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
 
     let ftype = DDiveFileType::from_ftype(metadata.file_type());
     let node_path = rel_path.clone();
-    
+
     let mut file_name = match node_path.file_name() {
         Some(name) => name.to_str().unwrap(),
-        None => {""}
-            
+        None => "",
     };
 
     let dir_name = node_path.parent();
     let mut dir_name: String = match dir_name {
-        Some(name) => {
-            String::from(name.to_str().unwrap())
-        }
-        None => {
-            String::from("")
-        }  
+        Some(name) => String::from(name.to_str().unwrap()),
+        None => String::from(""),
     };
-    
+
     let op = if file_name.starts_with(".wh.") {
         file_name = file_name.strip_prefix(".wh.").unwrap();
         FileOp::Remove
@@ -257,7 +252,7 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
     }
 
     let final_path = PathBuf::from(format!("{}{}", dir_name, file_name));
-    
+
     let node = TreeNode::new(&ftype, &op, &final_path);
     let node = parent.add_child(node);
 
@@ -292,7 +287,7 @@ pub fn parse_directory_into_tree(main_path: &PathBuf, path: PathBuf, parent : &m
         }
         &DDiveFileType::Badfile => {
             // Do nothing
-        }   
+        }
     }
 }
 
@@ -305,7 +300,11 @@ mod tests {
     fn construct_tree() -> super::TreeNode {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let test_dir = project_dir.join("test-files");
-        let mut parent = super::TreeNode::new(&super::DDiveFileType::Directory, &super::FileOp::Add, &PathBuf::from(""));
+        let mut parent = super::TreeNode::new(
+            &super::DDiveFileType::Directory,
+            &super::FileOp::Add,
+            &PathBuf::from(""),
+        );
         parse_directory_into_tree(&test_dir, test_dir.clone(), &mut parent);
         let parent = parent.prettyfy();
         return parent;
@@ -330,7 +329,10 @@ mod tests {
         assert_eq!(out[0].trim(), "Directory</>: Add");
         assert_eq!(out[1].trim(), "Directory</subtest>: Add");
         assert_eq!(out[2].trim(), "Directory</subtest/subsubtest>: Add");
-        assert_eq!(out[3].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
+        assert_eq!(
+            out[3].trim(),
+            "File</subtest/subsubtest/subsubtestfile>: Add"
+        );
     }
 
     #[test]
@@ -339,14 +341,17 @@ mod tests {
         let filter = "/subtest";
         let filtered_tree = tree.filter_tree_full_path(filter);
         let mut out = String::new();
-        filtered_tree.unwrap().print_tree(0,&mut out);
+        filtered_tree.unwrap().print_tree(0, &mut out);
         let out = out.split("\n").collect::<Vec<&str>>();
         assert_eq!(out[0].trim(), "Directory</>: Add");
         assert_eq!(out[1].trim(), "Directory</subtest>: Add");
         assert_eq!(out[2].trim(), "File</subtest/subtestfile>: Add");
         assert_eq!(out[3].trim(), "Directory</subtest/subsubtest>: Add");
-        assert_eq!(out[4].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
-        assert_eq!(out[5].trim(), "Directory</subtest/subsubtest2>: Add");   
+        assert_eq!(
+            out[4].trim(),
+            "File</subtest/subsubtest/subsubtestfile>: Add"
+        );
+        assert_eq!(out[5].trim(), "Directory</subtest/subsubtest2>: Add");
     }
 
     #[test]
@@ -379,8 +384,11 @@ mod tests {
         assert_eq!(out[0].trim(), "Directory</>: Add");
         assert_eq!(out[1].trim(), "Directory</subtest>: Add");
         assert_eq!(out[2].trim(), "Directory</subtest/subsubtest>: Add");
-        assert_eq!(out[3].trim(), "File</subtest/subsubtest/subsubtestfile>: Add");
-        assert_eq!(out[4].trim(), "Directory</subtest/subsubtest2>: Add");   
+        assert_eq!(
+            out[3].trim(),
+            "File</subtest/subsubtest/subsubtestfile>: Add"
+        );
+        assert_eq!(out[4].trim(), "Directory</subtest/subsubtest2>: Add");
     }
 
     #[test]
@@ -412,7 +420,6 @@ mod tests {
         for i in 0..outputs.len() {
             assert_eq!(out[i].trim(), outputs[i]);
         }
-
-
     }
 }
+

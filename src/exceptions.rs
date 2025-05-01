@@ -9,6 +9,7 @@ pub enum ImageParcingError {
     DockerAPIError,
     LayerParsingError,
     NonUnixFileSystem,
+    UnparceableFileName,
 }
 
 impl std::fmt::Display for ImageParcingError {
