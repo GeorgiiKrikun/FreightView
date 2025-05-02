@@ -2,6 +2,7 @@ use crate::{
     docker_file_tree::{DDiveFileType, FileOp},
     exceptions::ImageParcingError,
 };
+use serde::{Deserialize, Serialize, Serializer};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::Metadata;
@@ -11,14 +12,20 @@ use std::os::unix::fs::{/* MetadataExt,  */ PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 struct FileTreeNode {
-    name: String,
-    ftype: DDiveFileType,
-    fop: FileOp,
     // Children might need to be modified after creation, this is why we use RefCell
     // Multiple reference might be needed when e.g going through the tree breadth or depth first
     // Hence we use Rc<RefCell<T>> to allow multiple ownership and mutability
     children: RefCell<Vec<Rc<RefCell<FileTreeNode>>>>,
+    data: FileTreeNodeData,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone, Debug)]
+struct FileTreeNodeData {
+    name: String,
+    ftype: DDiveFileType,
+    fop: FileOp,
     permissions: String,
     // This is a path of the extracted docker tarball; It contains the pathes with .wh. inside
     disk_rel_path: PathBuf,
@@ -59,21 +66,26 @@ impl FileTreeNode {
             None => PathBuf::from("/"),
         };
 
-        let node = FileTreeNode {
+        let data = FileTreeNodeData {
             name,
             ftype,
             fop,
-            children: RefCell::new(Vec::<Rc<RefCell<FileTreeNode>>>::new()),
             permissions,
             disk_rel_path: relpath.to_path_buf(),
             vis_rel_path,
             size,
         };
 
+        let node = FileTreeNode {
+            children: RefCell::new(Vec::<Rc<RefCell<FileTreeNode>>>::new()),
+            data,
+        };
+
         return Ok(node);
     }
 }
 
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 struct FileTree {
     parent_node: Rc<RefCell<FileTreeNode>>,
     path_to_parent_node: PathBuf,
@@ -144,7 +156,7 @@ impl FileTree {
                 .pop_front()
                 .expect("Queue should not be empty at this point, aborting");
             // println!("Path: {:?}", path);
-            let node_rel_path = node.borrow().disk_rel_path.clone();
+            let node_rel_path = node.borrow().data.disk_rel_path.clone();
             // remove the leading slash
             let node_rel_path = node_rel_path
                 .strip_prefix("/")
@@ -262,58 +274,77 @@ mod tests {
 
     fn construct_tree() -> FileTree {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let test_dir = project_dir.join("test-files");
+        let test_dir = project_dir.join("test-assets/test-files");
         FileTree::new(&test_dir).unwrap()
     }
 
     #[test]
-    fn tree_test() {
+    fn tree() {
         let tree = construct_tree();
         for nodes in tree.iter() {
             let node = nodes.borrow();
-            println!(
-                "Name: {}, path: {}, vis_path {}, op: {}",
-                node.name,
-                node.disk_rel_path.to_str().unwrap(),
-                node.vis_rel_path.to_str().unwrap(),
-                node.fop
-            );
-            if node.name == "subtest3" {
+            if node.data.name == "subtest3" {
                 assert_eq!(
-                    node.ftype,
+                    node.data.ftype,
                     crate::docker_file_tree::DDiveFileType::Directory
                 );
-                assert_eq!(node.fop, crate::docker_file_tree::FileOp::Remove);
-                assert_eq!(node.disk_rel_path.to_str().unwrap(), "/.wh.subtest3");
-                assert_eq!(node.vis_rel_path.to_str().unwrap(), "/subtest3");
+                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Remove);
+                assert_eq!(node.data.disk_rel_path.to_str().unwrap(), "/.wh.subtest3");
+                assert_eq!(node.data.vis_rel_path.to_str().unwrap(), "/subtest3");
             }
-            // Name: subsubtest, path: /subtest/subsubtest, vis_path /subtest/subsubtest, op: Add
-            if node.name == "subsubtest" {
+            if node.data.name == "subsubtest" {
                 assert_eq!(
-                    node.ftype,
+                    node.data.ftype,
                     crate::docker_file_tree::DDiveFileType::Directory
                 );
-                assert_eq!(node.fop, crate::docker_file_tree::FileOp::Add);
-                assert_eq!(node.disk_rel_path.to_str().unwrap(), "/subtest/subsubtest");
-                assert_eq!(node.vis_rel_path.to_str().unwrap(), "/subtest/subsubtest");
-            }
-            // Name: subtestfile, path: /subtest/subtestfile, vis_path /subtest/subtestfile, op: Add
-            if node.name == "subtestfile" {
-                assert_eq!(node.ftype, crate::docker_file_tree::DDiveFileType::File);
-                assert_eq!(node.fop, crate::docker_file_tree::FileOp::Add);
-                assert_eq!(node.disk_rel_path.to_str().unwrap(), "/subtest/subtestfile");
-                assert_eq!(node.vis_rel_path.to_str().unwrap(), "/subtest/subtestfile");
-            }
-            // Name: whatever, path: /subtest2/.wh.whatever, vis_path /subtest2/whatever, op: Remove
-            if node.name == "whatever" {
-                assert_eq!(node.ftype, crate::docker_file_tree::DDiveFileType::File);
-                assert_eq!(node.fop, crate::docker_file_tree::FileOp::Remove);
+                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Add);
                 assert_eq!(
-                    node.disk_rel_path.to_str().unwrap(),
+                    node.data.disk_rel_path.to_str().unwrap(),
+                    "/subtest/subsubtest"
+                );
+                assert_eq!(
+                    node.data.vis_rel_path.to_str().unwrap(),
+                    "/subtest/subsubtest"
+                );
+            }
+            if node.data.name == "subtestfile" {
+                assert_eq!(
+                    node.data.ftype,
+                    crate::docker_file_tree::DDiveFileType::File
+                );
+                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Add);
+                assert_eq!(
+                    node.data.disk_rel_path.to_str().unwrap(),
+                    "/subtest/subtestfile"
+                );
+                assert_eq!(
+                    node.data.vis_rel_path.to_str().unwrap(),
+                    "/subtest/subtestfile"
+                );
+            }
+            if node.data.name == "whatever" {
+                assert_eq!(
+                    node.data.ftype,
+                    crate::docker_file_tree::DDiveFileType::File
+                );
+                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Remove);
+                assert_eq!(
+                    node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest2/.wh.whatever"
                 );
-                assert_eq!(node.vis_rel_path.to_str().unwrap(), "/subtest2/whatever");
+                assert_eq!(
+                    node.data.vis_rel_path.to_str().unwrap(),
+                    "/subtest2/whatever"
+                );
             }
         }
+    }
+
+    #[test]
+    fn tree_ser_deser() {
+        let tree = construct_tree();
+        let serialised = serde_json::to_string(&tree).unwrap();
+        let deserialised: FileTree = serde_json::from_str(&serialised).unwrap();
+        assert_eq!(tree.parent_node, deserialised.parent_node);
     }
 }
