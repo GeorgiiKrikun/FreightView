@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::FileType;
 use std::{collections::VecDeque, path::PathBuf};
 
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum DDiveFileType {
     Directory,
     File,
@@ -25,10 +25,19 @@ impl DDiveFileType {
 }
 
 // File operations type
-#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum FileOp {
     Add,
     Remove,
+}
+
+impl std::fmt::Display for FileOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileOp::Add => write!(f, "Add"),
+            FileOp::Remove => write!(f, "Remove"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
@@ -422,4 +431,3 @@ mod tests {
         }
     }
 }
-
