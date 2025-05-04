@@ -103,12 +103,36 @@ impl FileTreeNode {
         self.children.borrow_mut().push(child);
     }
 
-    fn get_children_names(self: &Self) -> Vec<String> {
+    pub fn get_children_names(self: &Self) -> Vec<String> {
         let mut names: Vec<String> = Vec::new();
         for child in self.children.borrow().iter() {
             names.push(child.borrow().data.name.clone());
         }
         return names;
+    }
+
+    pub fn get_children_paths(self: &Self) -> Vec<PathBuf> {
+        let mut paths: Vec<PathBuf> = Vec::new();
+        for child in self.children.borrow().iter() {
+            paths.push(child.borrow().data.vis_rel_path.clone());
+        }
+        return paths;
+    }
+
+    pub fn get_n_children(self: &Self) -> usize {
+        return self.children.borrow().len();
+    }
+
+    pub fn name(self: &Self) -> String {
+        return self.data.name.clone();
+    }
+
+    pub fn fop(self: &Self) -> FileOp {
+        return self.data.fop.clone();
+    }
+
+    pub fn path(self: &Self) -> PathBuf {
+        return self.data.vis_rel_path.clone();
     }
 }
 
@@ -182,40 +206,40 @@ impl FileTree {
             let node = queue
                 .pop_front()
                 .expect("Queue should not be empty at this point, aborting");
-            println!("Path: {:?}", path);
+            // println!("Path: {:?}", path);
             let node_rel_path = node.borrow().data.disk_rel_path.clone();
             // remove the leading slash
             let node_rel_path = node_rel_path
                 .strip_prefix("/")
                 .unwrap_or(&node_rel_path)
                 .to_path_buf();
-            println!("Node rel path: {:?}", node_rel_path);
+            // println!("Node rel path: {:?}", node_rel_path);
             let node_rel_path_str = node_rel_path.to_str().unwrap_or("");
             if node_rel_path_str == "var/lock" {
                 println!("Got to var/lock, skipping");
             }
             let path_to_node = path.join(node_rel_path);
-            println!("Directory: {:?}", path_to_node);
-            println!("Contents:");
+            // println!("Directory: {:?}", path_to_node);
+            // println!("Contents:");
             let metadata = path_to_node.symlink_metadata()?;
 
-            println!("Metadata: {:?}", metadata);
+            // println!("Metadata: {:?}", metadata);
             let ftype = DDiveFileType::from_ftype(metadata.file_type());
             match &ftype {
                 DDiveFileType::Badfile => {
-                    println!("Bad file: {:?}", path_to_node);
+                    // println!("Bad file: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::Symlink => {
-                    println!("Symlink: {:?}", path_to_node);
+                    // println!("Symlink: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::File => {
-                    println!("File: {:?}", path_to_node);
+                    // println!("File: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::Directory => {
-                    println!("Directory: {:?}", path_to_node);
+                    // println!("Directory: {:?}", path_to_node);
                     let entries = std::fs::read_dir(path_to_node.as_path())?;
 
                     // remove the bad files
@@ -391,7 +415,7 @@ impl FileTree {
 }
 
 // Define the iterator struct for breadth-first traversal
-struct BreadthFirstIterator {
+pub struct BreadthFirstIterator {
     queue: VecDeque<Rc<RefCell<FileTreeNode>>>,
 }
 
