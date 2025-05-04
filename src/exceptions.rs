@@ -12,6 +12,17 @@ pub enum ImageParcingError {
     UnparceableFileName,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum GUIError {
+    CantFilterTree,
+}
+
+impl std::fmt::Display for GUIError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl std::fmt::Display for ImageParcingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)

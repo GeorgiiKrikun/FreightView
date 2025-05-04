@@ -1,8 +1,8 @@
 use crate::{
     docker_file_tree::{DDiveFileType, FileOp},
-    exceptions::ImageParcingError,
+    exceptions::{GUIError, ImageParcingError},
 };
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::Metadata;
@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
-struct FileTreeNode {
+pub struct FileTreeNode {
     // Children might need to be modified after creation, this is why we use RefCell
     // Multiple reference might be needed when e.g going through the tree breadth or depth first
     // Hence we use Rc<RefCell<T>> to allow multiple ownership and mutability
@@ -22,7 +22,7 @@ struct FileTreeNode {
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone, Debug)]
-struct FileTreeNodeData {
+pub struct FileTreeNodeData {
     name: String,
     ftype: DDiveFileType,
     fop: FileOp,
@@ -83,10 +83,37 @@ impl FileTreeNode {
 
         return Ok(node);
     }
+
+    fn from_data(data: &FileTreeNodeData) -> FileTreeNode {
+        let node = FileTreeNode {
+            children: RefCell::new(Vec::<Rc<RefCell<FileTreeNode>>>::new()),
+            data: data.clone(),
+        };
+        return node;
+    }
+
+    fn get_child(self: &Self, i: usize) -> Option<Rc<RefCell<FileTreeNode>>> {
+        match self.children.borrow().get(i) {
+            Some(child) => Some(child.clone()),
+            None => None,
+        }
+    }
+
+    fn add_child(self: &Self, child: Rc<RefCell<FileTreeNode>>) {
+        self.children.borrow_mut().push(child);
+    }
+
+    fn get_children_names(self: &Self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+        for child in self.children.borrow().iter() {
+            names.push(child.borrow().data.name.clone());
+        }
+        return names;
+    }
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
-struct FileTree {
+pub struct FileTree {
     parent_node: Rc<RefCell<FileTreeNode>>,
     path_to_parent_node: PathBuf,
 }
@@ -143,8 +170,8 @@ fn perm_str_from_u32(perm: u32) -> String {
 }
 
 impl FileTree {
-    fn new(path: &Path) -> Result<FileTree, ImageParcingError> {
-        let metadata = path.metadata()?;
+    pub fn new(path: &Path) -> Result<FileTree, ImageParcingError> {
+        let metadata = path.symlink_metadata()?;
         let relpath = PathBuf::from("/");
         let parent_node = Rc::new(RefCell::new(FileTreeNode::from(&relpath, &metadata)?));
 
@@ -155,32 +182,40 @@ impl FileTree {
             let node = queue
                 .pop_front()
                 .expect("Queue should not be empty at this point, aborting");
-            // println!("Path: {:?}", path);
+            println!("Path: {:?}", path);
             let node_rel_path = node.borrow().data.disk_rel_path.clone();
             // remove the leading slash
             let node_rel_path = node_rel_path
                 .strip_prefix("/")
                 .unwrap_or(&node_rel_path)
                 .to_path_buf();
-            // println!("Node rel path: {:?}", node_rel_path);
-
+            println!("Node rel path: {:?}", node_rel_path);
+            let node_rel_path_str = node_rel_path.to_str().unwrap_or("");
+            if node_rel_path_str == "var/lock" {
+                println!("Got to var/lock, skipping");
+            }
             let path_to_node = path.join(node_rel_path);
-            // println!("Directory: {:?}", path_to_node);
-            // println!("Contents:");
+            println!("Directory: {:?}", path_to_node);
+            println!("Contents:");
+            let metadata = path_to_node.symlink_metadata()?;
 
-            let metadata = path_to_node.metadata()?;
+            println!("Metadata: {:?}", metadata);
             let ftype = DDiveFileType::from_ftype(metadata.file_type());
             match &ftype {
                 DDiveFileType::Badfile => {
+                    println!("Bad file: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::Symlink => {
+                    println!("Symlink: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::File => {
+                    println!("File: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::Directory => {
+                    println!("Directory: {:?}", path_to_node);
                     let entries = std::fs::read_dir(path_to_node.as_path())?;
 
                     // remove the bad files
@@ -204,7 +239,7 @@ impl FileTree {
                         let entry_rel_path = PathBuf::from("/")
                             .join(entry.strip_prefix(path).unwrap_or(&entry).to_path_buf());
                         // println!("Entry rel path: {:?}", entry_rel_path);
-                        let metadata = entry.metadata()?;
+                        let metadata = entry.symlink_metadata()?;
                         let child_node = Rc::new(RefCell::new(FileTreeNode::from(
                             &entry_rel_path,
                             &metadata,
@@ -227,13 +262,131 @@ impl FileTree {
         return Ok(tree);
     }
 
-    fn root(&self) -> Rc<RefCell<FileTreeNode>> {
+    pub fn new_from_node(node: Rc<RefCell<FileTreeNode>>) -> FileTree {
+        let tree = FileTree {
+            parent_node: node,
+            path_to_parent_node: PathBuf::from("/"),
+        };
+        return tree;
+    }
+    /// This function is used to filter the tree based on the full path
+    /// It returns a new tree with the filtered nodes
+    /// If the path is not filtered, it returns a full tree
+    ///
+    /// It always returns a tree, even if the path is not found,
+    /// But in in this case, it will add GUI error to the return value
+    pub fn filter_tree_full_path(&self, filter: &str) -> (FileTree, Option<GUIError>) {
+        let filter: Vec<&str> = filter.split("/").collect();
+        // clean up empty strings
+        let filter: Vec<&str> = filter.iter().filter(|&x| x != &"").map(|x| *x).collect();
+        if filter.len() == 0 {
+            return (self.clone(), None);
+        }
+
+        let root = self.root();
+        let root_data = &root.borrow().data;
+        let new_root = Rc::new(RefCell::new(FileTreeNode::from_data(root_data)));
+        let mut new_current = new_root.clone();
+        let mut old_current = root.clone();
+
+        // last search string should be taken care separately as it should not filter when the path is not
+        // yet fully typed
+        for d in 0..filter.len() - 1 {
+            let subfilter: &str = filter[d];
+            let mut next_ind: Option<usize> = None;
+            let children_names = old_current.borrow().get_children_names();
+            for i in 0..children_names.len() {
+                if children_names[i] == subfilter {
+                    next_ind = Some(i);
+                    break;
+                }
+            }
+
+            match next_ind {
+                Some(n) => {
+                    let old_child_opt = old_current.borrow().get_child(n);
+                    match &old_child_opt {
+                        Some(old_child) => {}
+                        None => return (self.clone(), Some(GUIError::CantFilterTree)),
+                    };
+                    let old_child = old_child_opt.unwrap();
+                    let old_child_data = old_child.borrow().data.clone();
+                    let new_child = Rc::new(RefCell::new(FileTreeNode::from_data(&old_child_data)));
+                    new_current.borrow().add_child(new_child.clone());
+                    new_current = new_child.clone();
+                    old_current = old_child.clone();
+                }
+                None => return (self.clone(), None),
+            }
+        }
+
+        // Parse last filter
+        let subfilter: &str = filter[filter.len() - 1];
+        let mut inds: Vec<usize> = Vec::new();
+
+        let children_names = old_current.borrow().get_children_names();
+        for i in 0..children_names.len() {
+            if children_names[i].starts_with(subfilter) {
+                inds.push(i);
+            }
+        }
+
+        if inds.len() == 0 {
+            return (self.clone(), Some(GUIError::CantFilterTree));
+        }
+
+        let mut new_children = Vec::<Rc<RefCell<FileTreeNode>>>::new();
+
+        for i in inds {
+            // Get the orig child node
+            let old_child_opt = old_current.borrow().get_child(i);
+            match &old_child_opt {
+                Some(old_child) => {}
+                None => return (self.clone(), Some(GUIError::CantFilterTree)),
+            };
+            let old_child = old_child_opt.unwrap();
+
+            let old_child_data = old_child.borrow().data.clone();
+            let new_child = Rc::new(RefCell::new(FileTreeNode::from_data(&old_child_data)));
+            new_children.push(new_child.clone());
+            // new_current.borrow().add_child(new_child.clone());
+        }
+
+        // sort children by name
+        new_children.sort_by(|a, b| {
+            let a_name = a.borrow().data.name.clone();
+            let b_name = b.borrow().data.name.clone();
+            a_name.cmp(&b_name)
+        });
+        new_current
+            .borrow()
+            .children
+            .borrow_mut()
+            .extend(new_children);
+
+        let new_tree = FileTree {
+            parent_node: new_root,
+            path_to_parent_node: self.path_to_parent_node.clone(),
+        };
+        return (new_tree, None);
+    }
+
+    pub fn root(&self) -> Rc<RefCell<FileTreeNode>> {
         self.parent_node.clone()
     }
 
-    fn iter(&self) -> BreadthFirstIterator {
+    pub fn iter(&self) -> BreadthFirstIterator {
         let root = self.root();
         BreadthFirstIterator::new(root)
+    }
+
+    fn get_node_by_name(&self, name: &str) -> Option<Rc<RefCell<FileTreeNode>>> {
+        for node in self.iter() {
+            if node.borrow().data.name == name {
+                return Some(node.clone());
+            }
+        }
+        None
     }
 }
 
@@ -270,6 +423,7 @@ impl Iterator for BreadthFirstIterator {
 #[cfg(test)]
 mod tests {
     use super::FileTree;
+    use assert_matches::assert_matches;
     use std::path::PathBuf;
 
     fn construct_tree() -> FileTree {
@@ -346,5 +500,67 @@ mod tests {
         let serialised = serde_json::to_string(&tree).unwrap();
         let deserialised: FileTree = serde_json::from_str(&serialised).unwrap();
         assert_eq!(tree.parent_node, deserialised.parent_node);
+    }
+
+    #[test]
+    fn tree_filter() {
+        let tree = construct_tree();
+        let (filtered_tree, err) = tree.filter_tree_full_path("subtest");
+        assert_matches!(err, None);
+        // First three nodes should be subtest, subtest2 and subtest3
+        let root = filtered_tree.root();
+        let names = root.borrow().get_children_names();
+
+        for name in names.iter() {
+            println!("Name: {}", name);
+        }
+
+        assert_eq!(names.len(), 3);
+        assert_eq!(names[0], "subtest");
+        assert_eq!(names[1], "subtest2");
+        assert_eq!(names[2], "subtest3");
+
+        // Check that after filter children are present
+        let subtest_node = tree.get_node_by_name("subtest");
+        assert_matches!(subtest_node, Some(_));
+        let subtest_node = subtest_node.unwrap();
+        let subtest_children = subtest_node.borrow().get_children_names();
+        assert_eq!(subtest_children.len(), 2);
+        assert_eq!(subtest_children[0], "subsubtest");
+        assert_eq!(subtest_children[1], "subtestfile");
+
+        for name in subtest_children.iter() {
+            println!("Name: {}", name);
+        }
+    }
+
+    #[test]
+    fn tree_filter_long() {
+        let tree = construct_tree();
+        let (filtered_tree, err) = tree.filter_tree_full_path("subtest/subsub");
+        assert_matches!(err, None);
+        // First three nodes should be subtest, subtest2 and subtest3
+        let root = filtered_tree.root();
+        let names = root.borrow().get_children_names();
+
+        for name in names.iter() {
+            println!("Name: {}", name);
+        }
+
+        assert_eq!(names.len(), 1);
+        assert_eq!(names[0], "subtest");
+
+        // Check that after filter children are present
+        let subtest_node = tree.get_node_by_name("subtest");
+        assert_matches!(subtest_node, Some(_));
+        let subtest_node = subtest_node.unwrap();
+        let subtest_children = subtest_node.borrow().get_children_names();
+        assert_eq!(subtest_children.len(), 2);
+        assert_eq!(subtest_children[0], "subsubtest");
+        assert_eq!(subtest_children[1], "subtestfile");
+
+        for name in subtest_children.iter() {
+            println!("Name: {}", name);
+        }
     }
 }

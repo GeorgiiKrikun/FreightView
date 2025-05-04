@@ -12,12 +12,13 @@ pub enum DDiveFileType {
 
 impl DDiveFileType {
     pub fn from_ftype(ftype: FileType) -> DDiveFileType {
-        if ftype.is_dir() {
-            DDiveFileType::Directory
+        if ftype.is_symlink() {
+            // Symlink needs to go first, since the symlink can lead somewhere outside the docker
+            DDiveFileType::Symlink
         } else if ftype.is_file() {
             DDiveFileType::File
-        } else if ftype.is_symlink() {
-            DDiveFileType::Symlink
+        } else if ftype.is_dir() {
+            DDiveFileType::Directory
         } else {
             DDiveFileType::Badfile
         }

@@ -1,4 +1,5 @@
-use crate::docker_file_tree::{DDiveFileType, FileOp, TreeNode, parse_directory_into_tree};
+use crate::docker_file_tree::{DDiveFileType, FileOp, /* , TreeNode, parse_directory_into_tree */};
+use crate::file_tree::{FileTree, FileTreeNode, FileTreeNodeData};
 use bollard::{Docker, image::ListImagesOptions, secret::ImageSummary};
 use futures_core::task::Poll;
 use futures_util::StreamExt;
@@ -16,12 +17,12 @@ use std::collections::HashMap;
 
 pub struct ImageLayer {
     pub name: String,
-    pub tree: TreeNode,
+    pub tree: FileTree,
     pub command: String,
 }
 
 impl ImageLayer {
-    pub fn new(name: String, tree: TreeNode, command: String) -> ImageLayer {
+    pub fn new(name: String, tree: FileTree, command: String) -> ImageLayer {
         ImageLayer {
             name,
             tree,
@@ -31,7 +32,7 @@ impl ImageLayer {
 
     fn get_cache_dir() -> Result<PathBuf, ImageParcingError> {
         let home = home_dir().ok_or(ImageParcingError::CantGetAHomeDir)?;
-        let ddive_cache_path = home.join(".ddive");
+        let ddive_cache_path = home.join(".cache/ddive");
         if !ddive_cache_path.exists() {
             std::fs::create_dir(&ddive_cache_path)?;
         }
@@ -80,7 +81,7 @@ impl ImageLayer {
     pub fn load(layer: &str) -> Result<ImageLayer, ImageParcingError> {
         let layer_cache_path = ImageLayer::get_layer_path_wstr(layer)?;
         let layer_cache_file = File::open(&layer_cache_path)?;
-        let layer_tree: TreeNode = serde_json::from_reader(layer_cache_file)?;
+        let layer_tree: FileTree = serde_json::from_reader(layer_cache_file)?;
         let cmd_cache_file = ImageLayer::get_layer_path_cmd_wstr(layer)?;
         let mut cmd_cache_file = File::open(&cmd_cache_file)?;
         let mut command = String::new();
@@ -177,7 +178,7 @@ impl ImageRepr {
         let _ = ImageLayer::filter_cached_layers(&mut non_cached_layers);
 
         // get non-cached layers
-        let layer_trees: Vec<(String, TreeNode)> =
+        let layer_trees: Vec<(String, FileTree)> =
             unpack_image_layers(&layer_folder, &non_cached_layers)?;
         let manifest_file = get_manifest_config_file(&img_folder)?;
         let mut commands = get_layer_commands(&img_folder, &manifest_file)?;
@@ -275,8 +276,8 @@ pub async fn download_image_file(
 pub fn unpack_image_layers(
     layer_folder: &PathBuf,
     layers: &Vec<String>,
-) -> Result<Vec<(String, TreeNode)>, ImageParcingError> {
-    let mut layer_trees: Vec<(String, TreeNode)> = Vec::new();
+) -> Result<Vec<(String, FileTree)>, ImageParcingError> {
+    let mut layer_trees: Vec<(String, FileTree)> = Vec::new();
 
     for layer in layers {
         let layer_spec = &layer[7..];
@@ -291,10 +292,7 @@ pub fn unpack_image_layers(
         layer_archive.unpack(&layer_dir)?;
 
         let main_dir = layer_dir.clone();
-        let mut layer_tree = TreeNode::new(&DDiveFileType::Directory, &FileOp::Add, &main_dir);
-        parse_directory_into_tree(&main_dir, layer_dir, &mut layer_tree);
-        let layer_tree = layer_tree.prettyfy();
-        // Change root of the tree to the first child
+        let mut layer_tree = FileTree::new(&main_dir)?;
         layer_trees.push((layer.to_string(), layer_tree));
     }
 
