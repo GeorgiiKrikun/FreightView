@@ -1,6 +1,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
+use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Paragraph, StatefulWidget, Widget};
 
 use super::focus_traits::WidgetFocusTrait;
@@ -16,6 +17,16 @@ pub struct SearchBarWidget {}
 impl SearchBarWidget {
     pub fn new() -> Self {
         Self {}
+    }
+
+    // Simple logic for blinking - you might want something more sophisticated
+    fn should_blink(&self) -> bool {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            % 1000
+            < 500 // Blink every second, on for 500ms, off for 500ms
     }
 }
 
@@ -60,12 +71,47 @@ impl StatefulWidget for SearchBarWidget {
     type State = SearchBarWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let mut search = Paragraph::new(state.search_string.clone()).block(
+        let search_string;
+        if state.is_toggled && self.should_blink() {
+            search_string = state.search_string.clone() + "█"; // Add a cursor character at
+        } else {
+            search_string = state.search_string.clone();
+        }
+
+        let mut search = Paragraph::new(search_string).block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(state.title.clone()),
         );
         Widget::render(search, area, buf);
+        let cursor_position = state.search_string.len();
+        let input = state.search_string.as_str();
+
+        // let paragraph = Paragraph::new(Spans::from(vec![
+        //     Span::raw(input),
+        //     Span::styled(
+        //         "█", // You can choose a different cursor character
+        //         if state.is_focused() && self.should_blink() {
+        //             Style::default().bg(Color::White) // Invert color for blinking
+        //         } else {
+        //             Style::default()
+        //         },
+        //     ),
+        // ]))
+        // .block(
+        //     Block::default()
+        //         .borders(Borders::ALL)
+        //         .title(state.title.clone()),
+        // );
+        // paragraph.render(area, buf);
+        //
+        // if state.is_focused() {
+        //     // Set the cursor position
+        //     buf.set_cursor(
+        //         area.x + 1 + cursor_position as u16, // +1 for the border
+        //         area.y + 1,                          // +1 for the border
+        //     );
+        // }
     }
 }
 
