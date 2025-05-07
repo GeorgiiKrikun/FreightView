@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs::Metadata;
 // use std::fs::Permissions;
+
 #[cfg(unix)]
 use std::os::unix::fs::{/* MetadataExt,  */ PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -372,8 +373,9 @@ impl FileTree {
 
             let old_child_data = old_child.borrow().data.clone();
             let new_child = Rc::new(RefCell::new(FileTreeNode::from_data(&old_child_data)));
+            // Last child should also have original node chidren added to keeep the tree
+            new_child.borrow_mut().children = old_child.borrow_mut().children.clone();
             new_children.push(new_child.clone());
-            // new_current.borrow().add_child(new_child.clone());
         }
 
         // sort children by name
@@ -448,6 +450,7 @@ impl Iterator for BreadthFirstIterator {
 mod tests {
     use super::FileTree;
     use assert_matches::assert_matches;
+    use std::fs::File;
     use std::path::PathBuf;
 
     fn construct_tree() -> FileTree {
@@ -586,5 +589,32 @@ mod tests {
         for name in subtest_children.iter() {
             println!("Name: {}", name);
         }
+    }
+
+    #[test]
+    fn real_life_tree() {
+        let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let test_file = project_dir.join("test-assets/real-life-layers/sha256:270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
+        let layer_cache_file = File::open(&test_file).unwrap();
+        let layer_tree: FileTree = serde_json::from_reader(layer_cache_file).unwrap();
+        let (filtered_tree, error) = layer_tree.filter_tree_full_path("/etc/");
+        assert_matches!(error, None);
+        let root = filtered_tree.root();
+        let children_names = root.borrow().get_children_names();
+        assert_eq!(children_names.len(), 1);
+        assert_eq!(children_names[0], "etc");
+        let etc_node = root.borrow().get_child(0).unwrap();
+        assert!(etc_node.borrow().get_n_children() > 0);
+        let etc_children = etc_node.borrow().get_children_names();
+        let apt_cache_name = etc_children.iter().position(|name| name == "apt").unwrap();
+        let apt_node = etc_node.borrow().get_child(apt_cache_name).unwrap();
+        let trusted = apt_node
+            .borrow()
+            .get_children_names()
+            .iter()
+            .position(|name| name == "trusted.gpg.d")
+            .unwrap();
+        let trusted_node = apt_node.borrow().get_child(trusted).unwrap();
+        assert_eq!(trusted_node.borrow().get_n_children(), 2);
     }
 }

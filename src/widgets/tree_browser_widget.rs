@@ -77,9 +77,9 @@ fn construct_items<'a>(layer: &'a ImageLayer, filter_str: &'a str) -> Vec<TreeIt
     // All that should be left in the map are the nodes below the root
 
     let keys: Vec<TreeItem<PathBuf>> = map.into_values().collect();
-    // sort by name
-    // let mut keys = keys;
-    // keys.sort_by(|a, b| a.identifier().cmp(b.identifier()));
+    // sort by name to avoid tree jumping in the browser
+    let mut keys = keys;
+    keys.sort_by(|a, b| a.identifier().cmp(b.identifier()));
     keys
 }
 
