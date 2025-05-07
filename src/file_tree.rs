@@ -137,7 +137,7 @@ impl FileTreeNode {
     }
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 pub struct FileTree {
     parent_node: Rc<RefCell<FileTreeNode>>,
     path_to_parent_node: PathBuf,
@@ -449,6 +449,7 @@ impl Iterator for BreadthFirstIterator {
 #[cfg(test)]
 mod tests {
     use super::FileTree;
+    use crate::exceptions::GUIError;
     use assert_matches::assert_matches;
     use std::fs::File;
     use std::path::PathBuf;
@@ -616,5 +617,16 @@ mod tests {
             .unwrap();
         let trusted_node = apt_node.borrow().get_child(trusted).unwrap();
         assert_eq!(trusted_node.borrow().get_n_children(), 2);
+    }
+
+    #[test]
+    fn search_error() {
+        let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let test_file = project_dir.join("test-assets/real-life-layers/sha256:270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
+        let layer_cache_file = File::open(&test_file).unwrap();
+        let layer_tree: FileTree = serde_json::from_reader(layer_cache_file).unwrap();
+        let (filtered_tree, error) = layer_tree.filter_tree_full_path("asdsadsasaddsaads");
+        assert_matches!(error, Some(GUIError::CantFilterTree));
+        assert_eq!(layer_tree, filtered_tree);
     }
 }

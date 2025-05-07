@@ -1,6 +1,7 @@
 use super::navigation_traits::WidgetNav;
 use crate::docker_file_tree::{FileOp, TreeNode};
 use crate::docker_image_utils::ImageLayer;
+use crate::exceptions::GUIError;
 use crate::file_tree::{FileTree, FileTreeNode};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -13,7 +14,10 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-fn construct_items<'a>(layer: &'a ImageLayer, filter_str: &'a str) -> Vec<TreeItem<'a, PathBuf>> {
+fn construct_items<'a>(
+    layer: &'a ImageLayer,
+    filter_str: &'a str,
+) -> (Vec<TreeItem<'a, PathBuf>>, Option<GUIError>) {
     // TODO:: think why this compiles without reference
     let tree = &layer.tree;
     // let filtered_tree = tree.filter_tree_full_path(filter_str);
@@ -80,12 +84,13 @@ fn construct_items<'a>(layer: &'a ImageLayer, filter_str: &'a str) -> Vec<TreeIt
     // sort by name to avoid tree jumping in the browser
     let mut keys = keys;
     keys.sort_by(|a, b| a.identifier().cmp(b.identifier()));
-    keys
+    (keys, error)
 }
 
 /// A widget that displays a tree structure using searchbar state; This does not correspond to multiple strings
 pub struct TreeBrowserWidgetState {
     search_string: String,
+    search_error: bool,
     tree_state: TreeState<PathBuf>,
 }
 
@@ -93,6 +98,7 @@ impl TreeBrowserWidgetState {
     pub fn new(search_string: &str) -> Self {
         TreeBrowserWidgetState {
             search_string: search_string.to_string(),
+            search_error: false,
             tree_state: TreeState::default(),
         }
     }
@@ -137,9 +143,17 @@ impl<'a> StatefulWidget for TreeBrowserWidget<'a> {
     type State = TreeBrowserWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let items = construct_items(self.corresponding_layer, &state.search_string);
+        let (items, error) = construct_items(self.corresponding_layer, &state.search_string);
+        match (error) {
+            Some(GUIError::CantFilterTree) => {
+                state.search_error = true;
+            }
+            None => {
+                state.search_error = false;
+            }
+        }
 
-        let tree_widget = Tree::new(&items)
+        let mut tree_widget = Tree::new(&items)
             .expect("WTF")
             .highlight_style(
                 Style::default()
@@ -148,6 +162,10 @@ impl<'a> StatefulWidget for TreeBrowserWidget<'a> {
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(">> ");
+
+        if state.search_error {
+            tree_widget = tree_widget.style(Style::default().bg(Color::Red));
+        }
 
         StatefulWidget::render(tree_widget, area, buf, &mut state.tree_state);
     }

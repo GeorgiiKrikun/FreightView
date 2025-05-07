@@ -1,26 +1,18 @@
 use crate::docker_image_utils::ImageRepr;
 use crate::widgets::focus_traits::WidgetFocusTrait;
-use crate::widgets::multitree_browser_widget::{MultiTreeBrowserWidget, MultiTreeBrowserWidgetState};
-use crate::widgets::searchbar::{SearchBarWidget, SearchBarWidgetState};
-use std::time::Duration;
-use std::io;
-use ratatui::{
-    layout::{
-        Constraint, 
-        Direction, 
-        Layout
-    }, 
-    widgets::ListState, 
-    DefaultTerminal, 
-    Frame
-};
-use crossterm::event::{
-    self, 
-    Event, 
-    KeyCode, 
-    KeyEvent
+use crate::widgets::multitree_browser_widget::{
+    MultiTreeBrowserWidget, MultiTreeBrowserWidgetState,
 };
 use crate::widgets::navigation_traits::{WidgetNav, WidgetNavBounds};
+use crate::widgets::searchbar::{SearchBarWidget, SearchBarWidgetState};
+use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use ratatui::{
+    DefaultTerminal, Frame,
+    layout::{Constraint, Direction, Layout},
+    widgets::ListState,
+};
+use std::io;
+use std::time::Duration;
 
 use crate::widgets::layer_browser_widget::{LayerBrowserWidget, LayerBrowserWidgetState};
 
@@ -43,8 +35,12 @@ pub struct App {
 
 impl App {
     pub fn new(item: ImageRepr) -> App {
-        let layer_names : Vec<String> = App::layer_names_from_img(&item);
-        let layer_commands : Vec<String> = item.layers.iter().map(|layer| layer.command.clone()).collect();
+        let layer_names: Vec<String> = App::layer_names_from_img(&item);
+        let layer_commands: Vec<String> = item
+            .layers
+            .iter()
+            .map(|layer| layer.command.clone())
+            .collect();
         if layer_names.len() == 0 {
             panic!("No layers found in image");
         }
@@ -55,7 +51,7 @@ impl App {
         let mut list_state = ListState::default();
         list_state.select(Some(0));
 
-        let mut app = App { 
+        let mut app = App {
             item,
             exit: false,
             layer_names: layer_names.clone(),
@@ -67,10 +63,9 @@ impl App {
         };
         app.adjust_tree_state_to_list();
         return app;
-
     }
 
-    fn layer_names_from_img(img : &ImageRepr) -> Vec<String> {
+    fn layer_names_from_img(img: &ImageRepr) -> Vec<String> {
         img.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
@@ -85,12 +80,12 @@ impl App {
                 self.deselect_all();
                 self.tree_state.focus_on(true);
                 self.focus = Focus::Tree;
-            },
+            }
             Focus::Tree => {
                 self.deselect_all();
-                self.list_state.focus_on(true); 
-                self.focus = Focus::List;                
-            },
+                self.list_state.focus_on(true);
+                self.focus = Focus::List;
+            }
             Focus::SearchBar => {}
         }
     }
@@ -111,27 +106,26 @@ impl App {
 
     fn next(&mut self) {
         match self.focus {
-            
             Focus::List => {
                 self.list_state.next();
                 self.adjust_tree_state_to_list();
-            },
+            }
             Focus::Tree => {
                 self.tree_state.next();
-            },
+            }
             Focus::SearchBar => {}
         }
     }
-    
+
     fn previous(&mut self) {
         match self.focus {
             Focus::List => {
                 self.list_state.prev();
                 self.adjust_tree_state_to_list();
-            },
+            }
             Focus::Tree => {
                 self.tree_state.prev();
-            },
+            }
             Focus::SearchBar => {}
         }
     }
@@ -144,8 +138,8 @@ impl App {
         Ok(())
     }
 
-    fn render(& mut self, frame: &mut Frame) {
-        let area  = frame.area();
+    fn render(&mut self, frame: &mut Frame) {
+        let area = frame.area();
         let vlayout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref())
@@ -161,9 +155,9 @@ impl App {
         layers_and_commands.ensure_bounds(&mut self.list_state);
         frame.render_stateful_widget(layers_and_commands, hlayout[0], &mut self.list_state);
 
-        let tree_widget = MultiTreeBrowserWidget::new( &self.item.layers[..]);
+        let tree_widget = MultiTreeBrowserWidget::new(&self.item.layers[..]);
         frame.render_stateful_widget(tree_widget, hlayout[1], &mut self.tree_state);
-        
+
         let search = SearchBarWidget::new();
         frame.render_stateful_widget(search, vlayout[1], &mut self.search_bar_state);
     }
@@ -176,7 +170,7 @@ impl App {
                 break;
             }
             let event = event.unwrap();
-            if ! event {
+            if !event {
                 break;
             } else {
                 let event = event::read().expect("Can't read key event");
@@ -192,45 +186,47 @@ impl App {
         let key_events = App::get_all_key_events();
         for key_event in key_events {
             match self.focus {
-                Focus::SearchBar => {
-                    match key_event.code {
-                        KeyCode::Char(c) => {
-                            self.search_bar_state.push_c(c);
-                            self.adjust_tree_state_to_search_bar_content();
-                        }
-                        KeyCode::Backspace => {
-                            self.search_bar_state.pop_c();
-                            self.adjust_tree_state_to_search_bar_content();
-                        }
-                        KeyCode::Enter => {
-                            self.focus = Focus::Tree;
-                        }
-                        KeyCode::Esc => {
-                            self.search_bar_state.focus_on(false);
-                            self.list_state.focus_on(true);
-                            self.focus = Focus::List;
-                        }
-                        _ => {}
+                Focus::SearchBar => match key_event.code {
+                    KeyCode::Char(c) => {
+                        self.search_bar_state.push_c(c);
+                        self.adjust_tree_state_to_search_bar_content();
                     }
+                    KeyCode::Backspace => {
+                        self.search_bar_state.pop_c();
+                        self.adjust_tree_state_to_search_bar_content();
+                    }
+                    KeyCode::Enter => {
+                        self.focus = Focus::Tree;
+                    }
+                    KeyCode::Esc => {
+                        self.search_bar_state.focus_on(false);
+                        self.list_state.focus_on(true);
+                        self.focus = Focus::List;
+                    }
+                    _ => {}
                 },
                 _ => {
                     match key_event.code {
-                        KeyCode::Down => self.next(), // Move selection down
-                        KeyCode::Up => self.previous(), // Move selection up
+                        KeyCode::Down => self.next(),                   // Move selection down
+                        KeyCode::Up => self.previous(),                 // Move selection up
                         KeyCode::Tab => self.circle_focus(), // Switch between list and tree
                         KeyCode::Char(' ') => self.tree_state.expand(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
-                        KeyCode::Char('f') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        KeyCode::Char('f')
+                            if key_event
+                                .modifiers
+                                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                        {
                             self.deselect_all();
                             self.search_bar_state.focus_on(true);
                             self.focus = Focus::SearchBar
-                        },
-                    _ => {}
+                        }
+                        _ => {}
+                    }
                 }
             }
-            }
-            
         }
         Ok(())
     }
 }
+

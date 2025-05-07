@@ -1,7 +1,6 @@
-
-
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::{Color, Style};
 use ratatui::widgets::{Block, Borders, Paragraph, StatefulWidget, Widget};
 
 use super::focus_traits::WidgetFocusTrait;
@@ -12,9 +11,7 @@ pub struct SearchBarWidgetState {
     search_string: String,
 }
 
-pub struct SearchBarWidget {
-
-}
+pub struct SearchBarWidget {}
 
 impl SearchBarWidget {
     pub fn new() -> Self {
@@ -34,7 +31,7 @@ impl SearchBarWidgetState {
     pub fn push_c(&mut self, ch: char) {
         self.search_string.push(ch);
     }
-    
+
     pub fn pop_c(&mut self) {
         self.search_string.pop();
     }
@@ -57,20 +54,18 @@ impl WidgetFocusTrait for SearchBarWidgetState {
     fn is_focused(&self) -> bool {
         self.is_toggled
     }
-
 }
 
 impl StatefulWidget for SearchBarWidget {
     type State = SearchBarWidgetState;
 
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State){ 
-        let search = Paragraph::new(state.search_string.clone())
-        .block(
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        let mut search = Paragraph::new(state.search_string.clone()).block(
             Block::default()
-            .borders(Borders::ALL)
-            .title(state.title.clone())
+                .borders(Borders::ALL)
+                .title(state.title.clone()),
         );
-
         Widget::render(search, area, buf);
     }
 }
+
