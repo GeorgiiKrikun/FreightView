@@ -5,11 +5,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fs::Metadata;
-// use std::fs::Permissions;
 
 #[cfg(unix)]
-use std::os::unix::fs::{/* MetadataExt,  */ PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -45,8 +43,9 @@ fn parse_name(name: &str) -> (String, FileOp) {
 
 #[cfg(unix)]
 impl FileTreeNode {
-    fn from(relpath: &Path, metadata: &Metadata) -> Result<FileTreeNode, ImageParcingError> {
-        let ftype = DDiveFileType::from_ftype(metadata.file_type());
+    fn from(relpath: &Path, abspath: &Path) -> Result<FileTreeNode, ImageParcingError> {
+        let metadata = abspath.symlink_metadata()?;
+        let ftype = DDiveFileType::from_ftype(metadata.file_type(), abspath);
         let permissions = perm_str_from_u32(metadata.permissions().mode());
         let size = metadata.len();
 
@@ -135,6 +134,10 @@ impl FileTreeNode {
     pub fn path(self: &Self) -> PathBuf {
         return self.data.vis_rel_path.clone();
     }
+
+    pub fn ftype(self: &Self) -> DDiveFileType {
+        return self.data.ftype.clone();
+    }
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
@@ -196,9 +199,8 @@ fn perm_str_from_u32(perm: u32) -> String {
 
 impl FileTree {
     pub fn new(path: &Path) -> Result<FileTree, ImageParcingError> {
-        let metadata = path.symlink_metadata()?;
         let relpath = PathBuf::from("/");
-        let parent_node = Rc::new(RefCell::new(FileTreeNode::from(&relpath, &metadata)?));
+        let parent_node = Rc::new(RefCell::new(FileTreeNode::from(&relpath, &path)?));
 
         let mut queue = VecDeque::<Rc<RefCell<FileTreeNode>>>::new();
         queue.push_front(parent_node.clone());
@@ -225,13 +227,13 @@ impl FileTree {
             let metadata = path_to_node.symlink_metadata()?;
 
             // println!("Metadata: {:?}", metadata);
-            let ftype = DDiveFileType::from_ftype(metadata.file_type());
+            let ftype = DDiveFileType::from_ftype(metadata.file_type(), &path_to_node);
             match &ftype {
                 DDiveFileType::Badfile => {
                     // println!("Bad file: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
-                DDiveFileType::Symlink => {
+                DDiveFileType::Symlink(path) => {
                     // println!("Symlink: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
@@ -264,11 +266,8 @@ impl FileTree {
                         let entry_rel_path = PathBuf::from("/")
                             .join(entry.strip_prefix(path).unwrap_or(&entry).to_path_buf());
                         // println!("Entry rel path: {:?}", entry_rel_path);
-                        let metadata = entry.symlink_metadata()?;
-                        let child_node = Rc::new(RefCell::new(FileTreeNode::from(
-                            &entry_rel_path,
-                            &metadata,
-                        )?));
+                        let child_node =
+                            Rc::new(RefCell::new(FileTreeNode::from(&entry_rel_path, &entry)?));
                         node.borrow_mut()
                             .children
                             .borrow_mut()

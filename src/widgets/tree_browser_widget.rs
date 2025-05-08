@@ -1,5 +1,5 @@
 use super::navigation_traits::WidgetNav;
-use crate::docker_file_tree::{FileOp, TreeNode};
+use crate::docker_file_tree::{DDiveFileType, FileOp};
 use crate::docker_image_utils::ImageLayer;
 use crate::exceptions::GUIError;
 use crate::file_tree::{FileTree, FileTreeNode};
@@ -40,8 +40,15 @@ fn construct_items<'a>(
             break;
         }
         let name = node.borrow().name();
-
         let path = node.borrow().path();
+        let name = match node.borrow().ftype() {
+            DDiveFileType::Directory => name,
+            DDiveFileType::File => name,
+            DDiveFileType::Symlink(points_to) => {
+                name + " -> " + points_to.to_string_lossy().as_ref()
+            }
+            DDiveFileType::Badfile => name + " (invalid)",
+        };
 
         let name: Text = match node.borrow().fop() {
             FileOp::Add => {
