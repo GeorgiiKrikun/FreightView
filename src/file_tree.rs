@@ -11,48 +11,48 @@ use std::rc::Rc;
 use std::fs::FileType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum DDiveFileType {
+pub enum EntryType {
     Directory,
     File,
     Symlink(PathBuf),
     Badfile,
 }
 
-impl DDiveFileType {
-    pub fn from_ftype(ftype: FileType, abspath: &Path) -> DDiveFileType {
+impl EntryType {
+    pub fn from_ftype(ftype: FileType, abspath: &Path) -> EntryType {
         if ftype.is_symlink() {
             let symlink_path = std::fs::read_link(abspath);
             match symlink_path {
                 Err(_) => {
                     println!("Error reading symlink: {}", abspath.display());
-                    return DDiveFileType::Badfile;
+                    return EntryType::Badfile;
                 }
                 Ok(path) => {
-                    return DDiveFileType::Symlink(path);
+                    return EntryType::Symlink(path);
                 }
             }
         } else if ftype.is_file() {
-            DDiveFileType::File
+            EntryType::File
         } else if ftype.is_dir() {
-            DDiveFileType::Directory
+            EntryType::Directory
         } else {
-            DDiveFileType::Badfile
+            EntryType::Badfile
         }
     }
 }
 
 // File operations type
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub enum FileOp {
+pub enum EntryOp {
     Add,
     Remove,
 }
 
-impl std::fmt::Display for FileOp {
+impl std::fmt::Display for EntryOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileOp::Add => write!(f, "Add"),
-            FileOp::Remove => write!(f, "Remove"),
+            EntryOp::Add => write!(f, "Add"),
+            EntryOp::Remove => write!(f, "Remove"),
         }
     }
 }
@@ -69,8 +69,8 @@ pub struct FileTreeNode {
 #[derive(Serialize, Deserialize, Eq, PartialEq, Hash, Clone, Debug)]
 pub struct FileTreeNodeData {
     name: String,
-    ftype: DDiveFileType,
-    fop: FileOp,
+    ftype: EntryType,
+    fop: EntryOp,
     permissions: String,
     // This is a path of the extracted docker tarball; It contains the pathes with .wh. inside
     disk_rel_path: PathBuf,
@@ -79,11 +79,11 @@ pub struct FileTreeNodeData {
     size: u64,
 }
 
-fn parse_name(name: &str) -> (String, FileOp) {
+fn parse_name(name: &str) -> (String, EntryOp) {
     let stripped_name = name.strip_prefix(".wh.");
     match stripped_name {
-        Some(stripped_name) => (stripped_name.to_string(), FileOp::Remove),
-        None => (name.to_string(), FileOp::Add),
+        Some(stripped_name) => (stripped_name.to_string(), EntryOp::Remove),
+        None => (name.to_string(), EntryOp::Add),
     }
 }
 
@@ -91,7 +91,7 @@ fn parse_name(name: &str) -> (String, FileOp) {
 impl FileTreeNode {
     fn from(relpath: &Path, abspath: &Path) -> Result<FileTreeNode, ImageParcingError> {
         let metadata = abspath.symlink_metadata()?;
-        let ftype = DDiveFileType::from_ftype(metadata.file_type(), abspath);
+        let ftype = EntryType::from_ftype(metadata.file_type(), abspath);
         let permissions = perm_str_from_u32(metadata.permissions().mode());
         let size = metadata.len();
 
@@ -173,7 +173,7 @@ impl FileTreeNode {
         return self.data.name.clone();
     }
 
-    pub fn fop(self: &Self) -> FileOp {
+    pub fn fop(self: &Self) -> EntryOp {
         return self.data.fop.clone();
     }
 
@@ -181,7 +181,7 @@ impl FileTreeNode {
         return self.data.vis_rel_path.clone();
     }
 
-    pub fn ftype(self: &Self) -> DDiveFileType {
+    pub fn ftype(self: &Self) -> EntryType {
         return self.data.ftype.clone();
     }
 }
@@ -264,18 +264,18 @@ impl FileTree {
             let path_to_node = path.join(node_rel_path);
             let metadata = path_to_node.symlink_metadata()?;
 
-            let ftype = DDiveFileType::from_ftype(metadata.file_type(), &path_to_node);
+            let ftype = EntryType::from_ftype(metadata.file_type(), &path_to_node);
             match &ftype {
-                DDiveFileType::Badfile => {
+                EntryType::Badfile => {
                     // Do nothing, skip bad files
                 }
-                DDiveFileType::Symlink(_) => {
+                EntryType::Symlink(_) => {
                     // Do nothing, skip bad files
                 }
-                DDiveFileType::File => {
+                EntryType::File => {
                     // Do nothing, skip bad files
                 }
-                DDiveFileType::Directory => {
+                EntryType::Directory => {
                     let entries = std::fs::read_dir(path_to_node.as_path())?;
 
                     // remove the bad files
@@ -482,7 +482,7 @@ impl Iterator for BreadthFirstIterator {
 
 #[cfg(test)]
 mod tests {
-    use super::{DDiveFileType, FileOp, FileTree};
+    use super::{EntryOp, EntryType, FileTree};
     use crate::exceptions::GUIError;
     use assert_matches::assert_matches;
     use std::fs::File;
@@ -500,14 +500,14 @@ mod tests {
         for nodes in tree.iter() {
             let node = nodes.borrow();
             if node.data.name == "subtest3" {
-                assert_eq!(node.data.ftype, DDiveFileType::Directory);
-                assert_eq!(node.data.fop, FileOp::Remove);
+                assert_eq!(node.data.ftype, EntryType::Directory);
+                assert_eq!(node.data.fop, EntryOp::Remove);
                 assert_eq!(node.data.disk_rel_path.to_str().unwrap(), "/.wh.subtest3");
                 assert_eq!(node.data.vis_rel_path.to_str().unwrap(), "/subtest3");
             }
             if node.data.name == "subsubtest" {
-                assert_eq!(node.data.ftype, DDiveFileType::Directory);
-                assert_eq!(node.data.fop, FileOp::Add);
+                assert_eq!(node.data.ftype, EntryType::Directory);
+                assert_eq!(node.data.fop, EntryOp::Add);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest/subsubtest"
@@ -518,8 +518,8 @@ mod tests {
                 );
             }
             if node.data.name == "subtestfile" {
-                assert_eq!(node.data.ftype, DDiveFileType::File);
-                assert_eq!(node.data.fop, FileOp::Add);
+                assert_eq!(node.data.ftype, EntryType::File);
+                assert_eq!(node.data.fop, EntryOp::Add);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest/subtestfile"
@@ -530,8 +530,8 @@ mod tests {
                 );
             }
             if node.data.name == "whatever" {
-                assert_eq!(node.data.ftype, DDiveFileType::File);
-                assert_eq!(node.data.fop, FileOp::Remove);
+                assert_eq!(node.data.ftype, EntryType::File);
+                assert_eq!(node.data.fop, EntryOp::Remove);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest2/.wh.whatever"

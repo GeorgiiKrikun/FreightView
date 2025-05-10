@@ -2,7 +2,7 @@ use super::navigation_traits::WidgetNav;
 use crate::docker_image_utils::ImageLayer;
 use crate::exceptions::GUIError;
 use crate::file_tree::FileTreeNode;
-use crate::file_tree::{DDiveFileType, FileOp};
+use crate::file_tree::{EntryOp, EntryType};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -42,20 +42,18 @@ fn construct_items<'a>(
         let name = node.borrow().name();
         let path = node.borrow().path();
         let name = match node.borrow().ftype() {
-            DDiveFileType::Directory => name,
-            DDiveFileType::File => name,
-            DDiveFileType::Symlink(points_to) => {
-                name + " -> " + points_to.to_string_lossy().as_ref()
-            }
-            DDiveFileType::Badfile => name + " (invalid)",
+            EntryType::Directory => name,
+            EntryType::File => name,
+            EntryType::Symlink(points_to) => name + " -> " + points_to.to_string_lossy().as_ref(),
+            EntryType::Badfile => name + " (invalid)",
         };
 
         let name: Text = match node.borrow().fop() {
-            FileOp::Add => {
+            EntryOp::Add => {
                 let style = Style::new().fg(Color::Green);
                 Text::styled(name, style)
             }
-            FileOp::Remove => {
+            EntryOp::Remove => {
                 let style = Style::new().fg(Color::Red);
                 Text::styled(name, style)
             }

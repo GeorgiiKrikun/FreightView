@@ -31,11 +31,11 @@ impl ImageLayer {
 
     fn get_cache_dir() -> Result<PathBuf, ImageParcingError> {
         let home = home_dir().ok_or(ImageParcingError::CantGetAHomeDir)?;
-        let ddive_cache_path = home.join(".cache/ddive");
-        if !ddive_cache_path.exists() {
-            std::fs::create_dir(&ddive_cache_path)?;
+        let cache_path = home.join(".cache/ddive");
+        if !cache_path.exists() {
+            std::fs::create_dir(&cache_path)?;
         }
-        Ok(ddive_cache_path)
+        Ok(cache_path)
     }
 
     fn get_layer_path_wstr(layer: &str) -> Result<PathBuf, ImageParcingError> {
