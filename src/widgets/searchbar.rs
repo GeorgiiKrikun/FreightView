@@ -71,12 +71,19 @@ impl StatefulWidget for SearchBarWidget {
     type State = SearchBarWidgetState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let search_string;
-        if state.is_toggled && self.should_blink() {
-            search_string = state.search_string.clone() + "█"; // Add a cursor character at
+        let search_string = if state.is_toggled {
+            if self.should_blink() {
+                state.search_string.clone() + "█" // Add a cursor character at
+            } else {
+                state.search_string.clone()
+            }
         } else {
-            search_string = state.search_string.clone();
-        }
+            if state.search_string.is_empty() {
+                "Filter here...".to_string()
+            } else {
+                state.search_string.clone()
+            }
+        };
 
         let mut search = Paragraph::new(search_string).block(
             Block::default()
@@ -86,32 +93,5 @@ impl StatefulWidget for SearchBarWidget {
         Widget::render(search, area, buf);
         let cursor_position = state.search_string.len();
         let input = state.search_string.as_str();
-
-        // let paragraph = Paragraph::new(Spans::from(vec![
-        //     Span::raw(input),
-        //     Span::styled(
-        //         "█", // You can choose a different cursor character
-        //         if state.is_focused() && self.should_blink() {
-        //             Style::default().bg(Color::White) // Invert color for blinking
-        //         } else {
-        //             Style::default()
-        //         },
-        //     ),
-        // ]))
-        // .block(
-        //     Block::default()
-        //         .borders(Borders::ALL)
-        //         .title(state.title.clone()),
-        // );
-        // paragraph.render(area, buf);
-        //
-        // if state.is_focused() {
-        //     // Set the cursor position
-        //     buf.set_cursor(
-        //         area.x + 1 + cursor_position as u16, // +1 for the border
-        //         area.y + 1,                          // +1 for the border
-        //     );
-        // }
     }
 }
-

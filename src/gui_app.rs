@@ -41,6 +41,7 @@ impl App {
             .iter()
             .map(|layer| layer.command.clone())
             .collect();
+
         if layer_names.len() == 0 {
             panic!("No layers found in image");
         }
@@ -61,6 +62,7 @@ impl App {
             tree_state: MultiTreeBrowserWidgetState::new("", &layer_names[..]),
             search_bar_state: SearchBarWidgetState::new(),
         };
+
         app.adjust_tree_state_to_list();
         return app;
     }
@@ -142,7 +144,7 @@ impl App {
         let area = frame.area();
         let vlayout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(95), Constraint::Percentage(5)].as_ref())
+            .constraints([Constraint::Fill(100), Constraint::Length(3)].as_ref())
             .split(area);
 
         let hlayout = Layout::default()
@@ -229,4 +231,3 @@ impl App {
         Ok(())
     }
 }
-
