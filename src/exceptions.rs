@@ -1,5 +1,6 @@
 use bollard::errors::Error as DockerError;
 
+#[allow(unused)]
 #[derive(Debug, thiserror::Error)]
 pub enum ImageParcingError {
     CantDownloadImage,

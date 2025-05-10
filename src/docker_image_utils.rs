@@ -1,5 +1,4 @@
-use crate::docker_file_tree::{DDiveFileType, FileOp, /* , TreeNode, parse_directory_into_tree */};
-use crate::file_tree::{FileTree, FileTreeNode, FileTreeNodeData};
+use crate::file_tree::FileTree;
 use bollard::{Docker, image::ListImagesOptions, secret::ImageSummary};
 use futures_core::task::Poll;
 use futures_util::StreamExt;
@@ -292,7 +291,7 @@ pub fn unpack_image_layers(
         layer_archive.unpack(&layer_dir)?;
 
         let main_dir = layer_dir.clone();
-        let mut layer_tree = FileTree::new(&main_dir)?;
+        let layer_tree = FileTree::new(&main_dir)?;
         layer_trees.push((layer.to_string(), layer_tree));
     }
 
@@ -370,7 +369,7 @@ struct History {
 mod tests {
     use super::*;
 
-    const DOCKER_FOLDER_PATH: &str = "test-docker-tar/";
+    const DOCKER_FOLDER_PATH: &str = "test-assets/test-docker-tar/";
 
     #[test]
     fn read_manifest_file() {

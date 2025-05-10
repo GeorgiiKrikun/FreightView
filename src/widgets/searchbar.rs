@@ -1,7 +1,5 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
-use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, Paragraph, StatefulWidget, Widget};
 
 use super::focus_traits::WidgetFocusTrait;
@@ -85,13 +83,11 @@ impl StatefulWidget for SearchBarWidget {
             }
         };
 
-        let mut search = Paragraph::new(search_string).block(
+        let search = Paragraph::new(search_string).block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(state.title.clone()),
         );
         Widget::render(search, area, buf);
-        let cursor_position = state.search_string.len();
-        let input = state.search_string.as_str();
     }
 }

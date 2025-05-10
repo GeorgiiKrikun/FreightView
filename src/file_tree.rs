@@ -1,7 +1,4 @@
-use crate::{
-    docker_file_tree::{DDiveFileType, FileOp},
-    exceptions::{GUIError, ImageParcingError},
-};
+use crate::exceptions::{GUIError, ImageParcingError};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -10,6 +7,55 @@ use std::collections::VecDeque;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+
+use std::fs::FileType;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum DDiveFileType {
+    Directory,
+    File,
+    Symlink(PathBuf),
+    Badfile,
+}
+
+impl DDiveFileType {
+    pub fn from_ftype(ftype: FileType, abspath: &Path) -> DDiveFileType {
+        if ftype.is_symlink() {
+            let symlink_path = std::fs::read_link(abspath);
+            match symlink_path {
+                Err(_) => {
+                    println!("Error reading symlink: {}", abspath.display());
+                    return DDiveFileType::Badfile;
+                }
+                Ok(path) => {
+                    return DDiveFileType::Symlink(path);
+                }
+            }
+        } else if ftype.is_file() {
+            DDiveFileType::File
+        } else if ftype.is_dir() {
+            DDiveFileType::Directory
+        } else {
+            DDiveFileType::Badfile
+        }
+    }
+}
+
+// File operations type
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum FileOp {
+    Add,
+    Remove,
+}
+
+impl std::fmt::Display for FileOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileOp::Add => write!(f, "Add"),
+            FileOp::Remove => write!(f, "Remove"),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 pub struct FileTreeNode {
@@ -209,40 +255,27 @@ impl FileTree {
             let node = queue
                 .pop_front()
                 .expect("Queue should not be empty at this point, aborting");
-            // println!("Path: {:?}", path);
             let node_rel_path = node.borrow().data.disk_rel_path.clone();
             // remove the leading slash
             let node_rel_path = node_rel_path
                 .strip_prefix("/")
                 .unwrap_or(&node_rel_path)
                 .to_path_buf();
-            // println!("Node rel path: {:?}", node_rel_path);
-            let node_rel_path_str = node_rel_path.to_str().unwrap_or("");
-            if node_rel_path_str == "var/lock" {
-                println!("Got to var/lock, skipping");
-            }
             let path_to_node = path.join(node_rel_path);
-            // println!("Directory: {:?}", path_to_node);
-            // println!("Contents:");
             let metadata = path_to_node.symlink_metadata()?;
 
-            // println!("Metadata: {:?}", metadata);
             let ftype = DDiveFileType::from_ftype(metadata.file_type(), &path_to_node);
             match &ftype {
                 DDiveFileType::Badfile => {
-                    // println!("Bad file: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
-                DDiveFileType::Symlink(path) => {
-                    // println!("Symlink: {:?}", path_to_node);
+                DDiveFileType::Symlink(_) => {
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::File => {
-                    // println!("File: {:?}", path_to_node);
                     // Do nothing, skip bad files
                 }
                 DDiveFileType::Directory => {
-                    // println!("Directory: {:?}", path_to_node);
                     let entries = std::fs::read_dir(path_to_node.as_path())?;
 
                     // remove the bad files
@@ -286,6 +319,7 @@ impl FileTree {
         return Ok(tree);
     }
 
+    #[allow(dead_code)]
     pub fn new_from_node(node: Rc<RefCell<FileTreeNode>>) -> FileTree {
         let tree = FileTree {
             parent_node: node,
@@ -330,7 +364,7 @@ impl FileTree {
                 Some(n) => {
                     let old_child_opt = old_current.borrow().get_child(n);
                     match &old_child_opt {
-                        Some(old_child) => {}
+                        Some(_) => {}
                         None => return (self.clone(), Some(GUIError::CantFilterTree)),
                     };
                     let old_child = old_child_opt.unwrap();
@@ -365,7 +399,7 @@ impl FileTree {
             // Get the orig child node
             let old_child_opt = old_current.borrow().get_child(i);
             match &old_child_opt {
-                Some(old_child) => {}
+                Some(_) => {}
                 None => return (self.clone(), Some(GUIError::CantFilterTree)),
             };
             let old_child = old_child_opt.unwrap();
@@ -405,6 +439,7 @@ impl FileTree {
         BreadthFirstIterator::new(root)
     }
 
+    #[allow(dead_code)]
     fn get_node_by_name(&self, name: &str) -> Option<Rc<RefCell<FileTreeNode>>> {
         for node in self.iter() {
             if node.borrow().data.name == name {
@@ -447,7 +482,7 @@ impl Iterator for BreadthFirstIterator {
 
 #[cfg(test)]
 mod tests {
-    use super::FileTree;
+    use super::{DDiveFileType, FileOp, FileTree};
     use crate::exceptions::GUIError;
     use assert_matches::assert_matches;
     use std::fs::File;
@@ -465,20 +500,14 @@ mod tests {
         for nodes in tree.iter() {
             let node = nodes.borrow();
             if node.data.name == "subtest3" {
-                assert_eq!(
-                    node.data.ftype,
-                    crate::docker_file_tree::DDiveFileType::Directory
-                );
-                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Remove);
+                assert_eq!(node.data.ftype, DDiveFileType::Directory);
+                assert_eq!(node.data.fop, FileOp::Remove);
                 assert_eq!(node.data.disk_rel_path.to_str().unwrap(), "/.wh.subtest3");
                 assert_eq!(node.data.vis_rel_path.to_str().unwrap(), "/subtest3");
             }
             if node.data.name == "subsubtest" {
-                assert_eq!(
-                    node.data.ftype,
-                    crate::docker_file_tree::DDiveFileType::Directory
-                );
-                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Add);
+                assert_eq!(node.data.ftype, DDiveFileType::Directory);
+                assert_eq!(node.data.fop, FileOp::Add);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest/subsubtest"
@@ -489,11 +518,8 @@ mod tests {
                 );
             }
             if node.data.name == "subtestfile" {
-                assert_eq!(
-                    node.data.ftype,
-                    crate::docker_file_tree::DDiveFileType::File
-                );
-                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Add);
+                assert_eq!(node.data.ftype, DDiveFileType::File);
+                assert_eq!(node.data.fop, FileOp::Add);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest/subtestfile"
@@ -504,11 +530,8 @@ mod tests {
                 );
             }
             if node.data.name == "whatever" {
-                assert_eq!(
-                    node.data.ftype,
-                    crate::docker_file_tree::DDiveFileType::File
-                );
-                assert_eq!(node.data.fop, crate::docker_file_tree::FileOp::Remove);
+                assert_eq!(node.data.ftype, DDiveFileType::File);
+                assert_eq!(node.data.fop, FileOp::Remove);
                 assert_eq!(
                     node.data.disk_rel_path.to_str().unwrap(),
                     "/subtest2/.wh.whatever"

@@ -20,7 +20,6 @@ ratatui = "0.29.0"
 crossterm = "0.28.1"
 tui-tree-widget = "*"
 thiserror = "2.0.12"
-config = "*"
 
 [dev-dependencies]
 assert_matches = "1.5"

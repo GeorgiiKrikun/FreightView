@@ -1,8 +1,8 @@
 use super::navigation_traits::WidgetNav;
-use crate::docker_file_tree::{DDiveFileType, FileOp};
 use crate::docker_image_utils::ImageLayer;
 use crate::exceptions::GUIError;
-use crate::file_tree::{FileTree, FileTreeNode};
+use crate::file_tree::FileTreeNode;
+use crate::file_tree::{DDiveFileType, FileOp};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -151,7 +151,7 @@ impl<'a> StatefulWidget for TreeBrowserWidget<'a> {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let (items, error) = construct_items(self.corresponding_layer, &state.search_string);
-        match (error) {
+        match error {
             Some(GUIError::CantFilterTree) => {
                 state.search_error = true;
             }
