@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn real_life_tree() {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let test_file = project_dir.join("test-assets/real-life-layers/sha256:270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
+        let test_file = project_dir.join("test-assets/real-life-layers/270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
         let layer_cache_file = File::open(&test_file).unwrap();
         let layer_tree: FileTree = serde_json::from_reader(layer_cache_file).unwrap();
         let (filtered_tree, error) = layer_tree.filter_tree_full_path("/etc/");
@@ -644,7 +644,7 @@ mod tests {
     #[test]
     fn search_error() {
         let project_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let test_file = project_dir.join("test-assets/real-life-layers/sha256:270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
+        let test_file = project_dir.join("test-assets/real-life-layers/270a1170e7e398434ff1b31e17e233f7d7b71aa99a40473615860068e86720af.json");
         let layer_cache_file = File::open(&test_file).unwrap();
         let layer_tree: FileTree = serde_json::from_reader(layer_cache_file).unwrap();
         let (filtered_tree, error) = layer_tree.filter_tree_full_path("asdsadsasaddsaads");
