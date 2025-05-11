@@ -13,5 +13,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## More
 * Extremely fast startup time, even for large images, if the layers have been already viewed.
-![Startup time hundred milliseconds](resources/start.jpg)
+![Startup time hundred milliseconds](resources/start.png)
 
