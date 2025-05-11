@@ -2,6 +2,16 @@
 name = "freightview"
 version = "0.1.0"
 edition = "2024"
+authors = ["Georgii Krikun"]
+rust-version = "1.86.0"
+description = "A terminal UI tool for viewing and managing local Docker images and containers."
+repository = "https://github.com/GeorgiiKrikun/FreightView"
+license-file = "LICENSE" 
+keywords = ["docker", "images", "containers", "terminal", "layers", "tui", "ui", "dive"]
+categories = ["command-line-utilities", "command-line-interface", "development-tools", "virtualization"]
+readme = "README.md"
+default-run = "freightview"
+
 
 [dependencies]
 bollard = "0.18.1"
@@ -22,4 +32,4 @@ tui-tree-widget = "*"
 thiserror = "2.0.12"
 
 [dev-dependencies]
-assert_matches = "1.5"
+assert_matches = "1.5" 
