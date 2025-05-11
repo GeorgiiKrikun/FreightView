@@ -20,5 +20,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 * View the list of layers, commands that were used to create them, and their content in a file tree view.
 ![Tree view](resources/tree.png)
 
+* Filter path with a search string to get to the changes that interest you faster.
+![Filter](resources/filter.png)
 
 
