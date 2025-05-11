@@ -17,18 +17,18 @@ default-run = "freightview"
 bollard = "0.18.1"
 tokio = { version = "1", features = ["full"] }
 clap = { version = "4.0", features = ["cargo","derive"] }
-flate2 = "*"
-tar = "*"
-futures-core = "*"
-futures-util = "*"
-walkdir = "*"
-tempfile = "*"
+flate2 = "1.1.1"
+tar = "0.4.44"
+futures-core = "0.3.31"
+futures-util = "0.3.31"
+walkdir = "2.5.0"
+tempfile = "3.19.1"
 serde = { version = "1.0", features = ["derive","rc"]}
 serde_json = "1.0"
-home = "*"
+home = "0.5.11"
 ratatui = "0.29.0"
 crossterm = "0.28.1"
-tui-tree-widget = "*"
+tui-tree-widget = "0.23.0"
 thiserror = "2.0.12"
 
 [dev-dependencies]
