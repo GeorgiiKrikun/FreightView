@@ -8,6 +8,7 @@ use clap::{Arg, command};
 use docker_image_utils::ImageRepr;
 use gui_app::App;
 use std::error::Error;
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -20,8 +21,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let docker = Docker::connect_with_socket_defaults().expect("Can't connect to docker");
 
+    let start = Instant::now();
     let img = ImageRepr::new(img_name, &docker).await;
-    ImageRepr::clean_up_img_cache()?;
+    let cleanup_result = ImageRepr::clean_up_img_cache();
+    match cleanup_result {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!(
+                "Error cleaning up image cache: {}, please cleanup manually, otherwise large cache will stay on your hard drive",
+                e
+            );
+            return Err(Box::from(e));
+        }
+    }
+
+    let elapsed = start.elapsed();
+    println!("Startup time: {:?}", elapsed);
+
     let img = match img {
         Ok(img) => img,
         Err(e) => {
