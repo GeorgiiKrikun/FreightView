@@ -20,7 +20,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let docker = Docker::connect_with_socket_defaults().expect("Can't connect to docker");
 
-    let img = ImageRepr::new(img_name, &docker).await?;
+    let img = ImageRepr::new(img_name, &docker).await;
+    ImageRepr::clean_up_img_cache()?;
+    let img = match img {
+        Ok(img) => img,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return Err(Box::from(e));
+        }
+    };
 
     let mut terminal = ratatui::init();
 

@@ -31,7 +31,7 @@ impl ImageLayer {
 
     fn get_cache_dir() -> Result<PathBuf, ImageParcingError> {
         let home = home_dir().ok_or(ImageParcingError::CantGetAHomeDir)?;
-        let cache_path = home.join(".cache/ddive");
+        let cache_path = home.join(".cache/freightview");
         if !cache_path.exists() {
             std::fs::create_dir(&cache_path)?;
         }
@@ -138,8 +138,8 @@ pub struct ImageRepr {
 impl ImageRepr {
     pub async fn new(name: String, docker: &Docker) -> Result<ImageRepr, ImageParcingError> {
         let temp_dir = TempDir::new()?;
-        let img_tar_file_path = PathBuf::from(temp_dir.path()).join("image.tar");
-        let img_folder = PathBuf::from(temp_dir.path()).join("image");
+        let img_tar_file_path = ImageRepr::get_img_cache_dir()?.join("image.tar");
+        let img_folder = ImageRepr::get_img_cache_dir()?.join("image");
 
         let layers = get_image_layers(&docker, &name).await?;
         let all_layers_cached: bool = layers.iter().all(|layer| ImageLayer::check_cache(layer));
@@ -208,6 +208,23 @@ impl ImageRepr {
             layers: all_layers,
         })
     }
+
+    pub fn get_img_cache_dir() -> Result<PathBuf, ImageParcingError> {
+        let home = home_dir().ok_or(ImageParcingError::CantGetAHomeDir)?;
+        let cache_path = home.join(".cache/freightview/image_cache/");
+        if !cache_path.exists() {
+            std::fs::create_dir_all(&cache_path)?;
+        }
+        Ok(cache_path)
+    }
+
+    pub fn clean_up_img_cache() -> Result<(), ImageParcingError> {
+        let cache_path = ImageRepr::get_img_cache_dir()?;
+        if cache_path.exists() {
+            std::fs::remove_dir_all(&cache_path)?;
+        }
+        Ok(())
+    }
 }
 
 #[allow(dead_code)]
@@ -250,6 +267,7 @@ pub async fn download_image_file(
 ) -> Result<(), ImageParcingError> {
     let mut stream = docker.export_image(img_name);
     let mut context = std::task::Context::from_waker(futures_util::task::noop_waker_ref());
+    println!("Downloading image: {}", img_name);
     let mut file = File::create(&img_tar_file_path)?;
 
     loop {
@@ -258,7 +276,17 @@ pub async fn download_image_file(
             Poll::Ready(option) => match option {
                 // Got a chunk of data
                 Some(errchnk) => {
-                    file.write_all(&errchnk?)?;
+                    println!("Got chunk of data");
+                    let res = file.write_all(&errchnk?);
+                    if let Err(e) = res {
+                        println!("Error writing to file: {}", e);
+                        return Err(ImageParcingError::FilesystemError);
+                    }
+                    let res = file.flush();
+                    if let Err(e) = res {
+                        println!("Error flushing file: {}", e);
+                        return Err(ImageParcingError::FilesystemError);
+                    }
                 }
                 // This is the end of the stream
                 None => {
