@@ -1,5 +1,6 @@
 use crate::docker_image_utils::ImageRepr;
 use crate::widgets::focus_traits::WidgetFocusTrait;
+use crate::widgets::help_widget;
 use crate::widgets::multitree_browser_widget::{
     MultiTreeBrowserWidget, MultiTreeBrowserWidgetState,
 };
@@ -20,6 +21,7 @@ enum Focus {
     List,
     Tree,
     SearchBar,
+    Help,
 }
 
 pub struct App {
@@ -89,6 +91,7 @@ impl App {
                 self.focus = Focus::List;
             }
             Focus::SearchBar => {}
+            Focus::Help => {}
         }
     }
 
@@ -116,6 +119,7 @@ impl App {
                 self.tree_state.next();
             }
             Focus::SearchBar => {}
+            Focus::Help => {}
         }
     }
 
@@ -129,6 +133,7 @@ impl App {
                 self.tree_state.prev();
             }
             Focus::SearchBar => {}
+            Focus::Help => {}
         }
     }
 
@@ -142,6 +147,13 @@ impl App {
 
     fn render(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        match self.focus {
+            Focus::Help => {
+                help_widget::draw_help(frame, area);
+                return;
+            }
+            _ => {}
+        }
         let vlayout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Fill(100), Constraint::Length(3)].as_ref())
@@ -207,6 +219,14 @@ impl App {
                     }
                     _ => {}
                 },
+                Focus::Help => match key_event.code {
+                    KeyCode::Esc => {
+                        self.focus = Focus::List;
+                        self.deselect_all();
+                        self.list_state.focus_on(true);
+                    }
+                    _ => {}
+                },
                 _ => {
                     match key_event.code {
                         KeyCode::Down => self.next(),                   // Move selection down
@@ -214,6 +234,10 @@ impl App {
                         KeyCode::Tab => self.circle_focus(), // Switch between list and tree
                         KeyCode::Char(' ') => self.tree_state.expand(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
+                        KeyCode::Char('h') => {
+                            self.deselect_all();
+                            self.focus = Focus::Help;
+                        }
                         KeyCode::Char('f')
                             if key_event
                                 .modifiers
