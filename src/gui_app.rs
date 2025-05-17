@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use crate::widgets::layer_browser_widget::{LayerBrowserWidget, LayerBrowserWidgetState};
 
+#[derive(Clone, Copy)]
 enum Focus {
     List,
     Tree,
@@ -32,6 +33,7 @@ pub struct App {
     layer_names: Vec<String>,
     layer_commands: Vec<String>,
     focus: Focus,
+    prev_focus: Focus,
     search_bar_state: SearchBarWidgetState,
 }
 
@@ -61,6 +63,7 @@ impl App {
             layer_commands,
             list_state: LayerBrowserWidgetState::new(),
             focus: Focus::List,
+            prev_focus: Focus::Tree,
             tree_state: MultiTreeBrowserWidgetState::new("", &layer_names[..]),
             search_bar_state: SearchBarWidgetState::new(),
         };
@@ -73,22 +76,19 @@ impl App {
         img.layers.iter().map(|layer| layer.name.clone()).collect()
     }
 
-    fn deselect_all(&mut self) {
-        self.list_state.focus_on(false);
-        self.tree_state.focus_on(false);
-    }
+    // TODO: remove
+    // fn deselect_all(&mut self) {
+    //     self.list_state.focus_on(false);
+    //     self.tree_state.focus_on(false);
+    // }
 
     fn circle_focus(&mut self) {
         match self.focus {
             Focus::List => {
-                self.deselect_all();
-                self.tree_state.focus_on(true);
-                self.focus = Focus::Tree;
+                self.change_focus(Focus::Tree);
             }
             Focus::Tree => {
-                self.deselect_all();
-                self.list_state.focus_on(true);
-                self.focus = Focus::List;
+                self.change_focus(Focus::List);
             }
             Focus::SearchBar => {}
             Focus::Help => {}
@@ -196,6 +196,23 @@ impl App {
         key_events
     }
 
+    fn change_focus(&mut self, focus: Focus) {
+        // NOTE: help is stateless, so we don't need to change its focus
+        self.list_state.focus_on(false);
+        self.tree_state.focus_on(false);
+        self.search_bar_state.focus_on(false);
+        self.prev_focus = self.focus;
+
+        match focus {
+            Focus::List => self.list_state.focus_on(true),
+            Focus::Tree => self.tree_state.focus_on(true),
+            Focus::SearchBar => self.search_bar_state.focus_on(true),
+            Focus::Help => {}
+        }
+
+        self.focus = focus;
+    }
+
     fn handle_events(&mut self) -> io::Result<()> {
         let key_events = App::get_all_key_events();
         for key_event in key_events {
@@ -209,21 +226,14 @@ impl App {
                         self.search_bar_state.pop_c();
                         self.adjust_tree_state_to_search_bar_content();
                     }
-                    KeyCode::Enter => {
-                        self.focus = Focus::Tree;
-                    }
-                    KeyCode::Esc => {
-                        self.search_bar_state.focus_on(false);
-                        self.list_state.focus_on(true);
-                        self.focus = Focus::List;
+                    KeyCode::Esc | KeyCode::Enter => {
+                        self.change_focus(self.prev_focus);
                     }
                     _ => {}
                 },
                 Focus::Help => match key_event.code {
-                    KeyCode::Esc => {
-                        self.focus = Focus::List;
-                        self.deselect_all();
-                        self.list_state.focus_on(true);
+                    KeyCode::Char('q') => {
+                        self.change_focus(self.prev_focus);
                     }
                     _ => {}
                 },
@@ -235,17 +245,14 @@ impl App {
                         KeyCode::Char(' ') => self.tree_state.expand(), // Expand tree
                         KeyCode::Char('q') => self.exit = true, // Quit
                         KeyCode::Char('h') => {
-                            self.deselect_all();
-                            self.focus = Focus::Help;
+                            self.change_focus(Focus::Help);
                         }
                         KeyCode::Char('f')
                             if key_event
                                 .modifiers
                                 .contains(crossterm::event::KeyModifiers::CONTROL) =>
                         {
-                            self.deselect_all();
-                            self.search_bar_state.focus_on(true);
-                            self.focus = Focus::SearchBar
+                            self.change_focus(Focus::SearchBar);
                         }
                         _ => {}
                     }

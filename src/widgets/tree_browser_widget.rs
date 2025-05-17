@@ -130,17 +130,21 @@ impl<'a> TreeBrowserWidget<'a> {
     }
 }
 
+fn select_next_tree_state(tree_state: &mut TreeState<PathBuf>) {
+    tree_state.select_relative(|current| current.map_or(0, |current| current.saturating_add(1)));
+}
+
+fn select_prev_tree_state(tree_state: &mut TreeState<PathBuf>) {
+    tree_state.select_relative(|current| current.map_or(0, |current| current.saturating_sub(1)));
+}
+
 impl WidgetNav for TreeBrowserWidgetState {
     fn next(&mut self) {
-        let selected_state = &mut self.tree_state;
-        selected_state
-            .select_relative(|current| current.map_or(0, |current| current.saturating_add(1)));
+        select_next_tree_state(&mut self.tree_state);
     }
 
     fn prev(&mut self) {
-        let selected_state = &mut self.tree_state;
-        selected_state
-            .select_relative(|current| current.map_or(0, |current| current.saturating_sub(1)));
+        select_prev_tree_state(&mut self.tree_state);
     }
 }
 
