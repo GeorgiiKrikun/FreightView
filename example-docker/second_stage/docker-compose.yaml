@@ -1,0 +1,7 @@
+services:
+  ddive-test-img-2:
+    image: ddive-test-img-2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ddive-test-img-2

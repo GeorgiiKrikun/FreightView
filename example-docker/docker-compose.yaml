@@ -1,7 +1,3 @@
-services:
-  ddive-test-img:
-    image: ddive-test-img
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ddive-test-img
+include: 
+  - first_stage/docker-compose.yaml
+  - second_stage/docker-compose.yaml

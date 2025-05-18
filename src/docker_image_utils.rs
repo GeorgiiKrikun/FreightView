@@ -100,6 +100,13 @@ impl ImageLayer {
         }
     }
 
+    /// Filters cached layers from the provided list of layers.
+    ///
+    /// # Arguments
+    /// * `layers` - A mutable reference to a vector of layer identifiers (strings).
+    /// # Returns
+    /// * `Ok(Vec<ImageLayer>)` - A vector of `ImageLayer` objects representing the cached layers.
+    /// * `Err(ImageParcingError)` - An error if loading a cached layer fails.
     pub fn filter_cached_layers(
         layers: &mut Vec<String>,
     ) -> Result<Vec<ImageLayer>, ImageParcingError> {
@@ -138,8 +145,8 @@ pub struct ImageRepr {
 impl ImageRepr {
     pub async fn new(name: String, docker: &Docker) -> Result<ImageRepr, ImageParcingError> {
         let temp_dir = TempDir::new()?;
-        let img_tar_file_path = ImageRepr::get_img_cache_dir()?.join("image.tar");
-        let img_folder = ImageRepr::get_img_cache_dir()?.join("image");
+        let img_tar_file_path = ImageRepr::get_img_cache_dir(&name)?.join("image.tar");
+        let img_folder = ImageRepr::get_img_cache_dir(&name)?.join("image");
 
         let layers = get_image_layers(&docker, &name).await?;
         let all_layers_cached: bool = layers.iter().all(|layer| ImageLayer::check_cache(layer));
@@ -176,21 +183,28 @@ impl ImageRepr {
         // Get cached layers
         let _ = ImageLayer::filter_cached_layers(&mut non_cached_layers);
 
-        // get non-cached layers
-        let layer_trees: Vec<(String, FileTree)> =
+        // get non-cached layer trees
+        let non_cached_layer_trees: Vec<(String, FileTree)> =
             unpack_image_layers(&layer_folder, &non_cached_layers)?;
-        let manifest_file = get_manifest_config_file(&img_folder)?;
-        let mut commands = get_layer_commands(&img_folder, &manifest_file)?;
 
-        if commands.len() != layer_trees.len() {
-            print!("Commands and layers size mismatch; commands won't be printed");
-            commands.clear();
-            commands.resize(layer_trees.len(), String::from("Not available"));
-        }
+        let manifest_file = get_manifest_config_file(&img_folder)?;
+        let commands = get_layer_commands(&img_folder, &manifest_file)?;
+        let cmd_map: HashMap<String, String> = layers
+            .iter()
+            .map(|layer| layer.to_string())
+            .zip(commands.into_iter())
+            .collect();
 
         // Construct cache from non-cached layers
-        for ((layer_name, layer_tree), command) in layer_trees.into_iter().zip(commands.into_iter())
-        {
+        for (layer_name, layer_tree) in non_cached_layer_trees.into_iter() {
+            let command = match cmd_map.get(&layer_name) {
+                Some(cmd) => cmd.clone(),
+                None => {
+                    println!("No command for layer {}", layer_name);
+                    String::from("Not available")
+                }
+            };
+
             let layer = ImageLayer::new(layer_name, layer_tree, command);
             layer.save()?;
         }
@@ -209,17 +223,18 @@ impl ImageRepr {
         })
     }
 
-    pub fn get_img_cache_dir() -> Result<PathBuf, ImageParcingError> {
+    pub fn get_img_cache_dir(image: &str) -> Result<PathBuf, ImageParcingError> {
+        let image = image.replace(":", "_tagged_");
         let home = home_dir().ok_or(ImageParcingError::CantGetAHomeDir)?;
-        let cache_path = home.join(".cache/freightview/image_cache/");
+        let cache_path = home.join(format!(".cache/freightview/image_cache/{}", image));
         if !cache_path.exists() {
             std::fs::create_dir_all(&cache_path)?;
         }
         Ok(cache_path)
     }
 
-    pub fn clean_up_img_cache() -> Result<(), ImageParcingError> {
-        let cache_path = ImageRepr::get_img_cache_dir()?;
+    pub fn clean_up_img_cache(name: &str) -> Result<(), ImageParcingError> {
+        let cache_path = ImageRepr::get_img_cache_dir(name)?;
         if cache_path.exists() {
             std::fs::remove_dir_all(&cache_path)?;
         }
@@ -276,7 +291,6 @@ pub async fn download_image_file(
             Poll::Ready(option) => match option {
                 // Got a chunk of data
                 Some(errchnk) => {
-                    println!("Got chunk of data");
                     let res = file.write_all(&errchnk?);
                     if let Err(e) = res {
                         println!("Error writing to file: {}", e);

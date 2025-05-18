@@ -24,11 +24,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .expect("Can't parse to string")
         .clone();
 
+    // Massage name to append latest tag if not specified
+    let img_name = if img_name.contains(':') {
+        img_name
+    } else {
+        format!("{}:latest", img_name)
+    };
+
     let docker = Docker::connect_with_socket_defaults().expect("Can't connect to docker");
 
     let start = Instant::now();
-    let img = ImageRepr::new(img_name, &docker).await;
-    let cleanup_result = ImageRepr::clean_up_img_cache();
+    let img = ImageRepr::new(img_name.clone(), &docker).await;
+    let cleanup_result = ImageRepr::clean_up_img_cache(&img_name);
     match cleanup_result {
         Ok(_) => {}
         Err(e) => {
