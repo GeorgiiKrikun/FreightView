@@ -188,7 +188,7 @@ impl ImageRepr {
             unpack_image_layers(&layer_folder, &non_cached_layers)?;
 
         let manifest_file = get_manifest_config_file(&img_folder)?;
-        let mut commands = get_layer_commands(&img_folder, &manifest_file)?;
+        let commands = get_layer_commands(&img_folder, &manifest_file)?;
         let cmd_map: HashMap<String, String> = layers
             .iter()
             .map(|layer| layer.to_string())
