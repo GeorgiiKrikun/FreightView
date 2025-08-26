@@ -35,17 +35,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let img = ImageRepr::new(img_name.clone(), &docker).await;
-    // let cleanup_result = ImageRepr::clean_up_img_cache(&img_name);
-    // match cleanup_result {
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         eprintln!(
-    //             "Error cleaning up image cache: {}, please cleanup manually, otherwise large cache will stay on your hard drive",
-    //             e
-    //         );
-    //         return Err(Box::from(e));
-    //     }
-    // }
+    let cleanup_result = ImageRepr::clean_up_img_cache(&img_name);
+    match cleanup_result {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!(
+                "Error cleaning up image cache: {}, please cleanup manually, otherwise large cache will stay on your hard drive",
+                e
+            );
+            return Err(Box::from(e));
+        }
+    }
 
     let elapsed = start.elapsed();
     println!("Startup time: {:?}", elapsed);
