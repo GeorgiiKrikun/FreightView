@@ -357,9 +357,7 @@ pub fn get_layer_commands(
 ) -> Result<Vec<String>, ImageParcingError> {
     let config_path = docker_root_folder.join(config_file);
     let config_file = File::open(&config_path)?;
-    println!("Reading config file: {}", config_path.display());
     let config: Config = serde_json::from_reader(config_file)?;
-    println!("Found {} history entries", config.history.len());
     let mut commands: Vec<String> = Vec::new();
     for history in config.history {
         match history.empty_layer {
