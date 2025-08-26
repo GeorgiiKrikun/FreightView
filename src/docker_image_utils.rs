@@ -188,7 +188,7 @@ impl ImageRepr {
             unpack_image_layers(&layer_folder, &non_cached_layers)?;
 
         let manifest_file = get_manifest_config_file(&img_folder)?;
-        let commands = get_layer_commands(&img_folder, &manifest_file)?;
+        let mut commands = get_layer_commands(&img_folder, &manifest_file)?;
         let cmd_map: HashMap<String, String> = layers
             .iter()
             .map(|layer| layer.to_string())
@@ -357,7 +357,9 @@ pub fn get_layer_commands(
 ) -> Result<Vec<String>, ImageParcingError> {
     let config_path = docker_root_folder.join(config_file);
     let config_file = File::open(&config_path)?;
+    println!("Reading config file: {}", config_path.display());
     let config: Config = serde_json::from_reader(config_file)?;
+    println!("Found {} history entries", config.history.len());
     let mut commands: Vec<String> = Vec::new();
     for history in config.history {
         match history.empty_layer {
@@ -365,11 +367,11 @@ pub fn get_layer_commands(
                 if empty {
                     continue;
                 } else {
-                    commands.push(history.created_by.trim().to_string());
+                    commands.push(history.created_by.unwrap_or(String::from("Unknown command")).trim().to_string());
                 }
             }
             None => {
-                commands.push(history.created_by.trim().to_string());
+                commands.push(history.created_by.unwrap_or(String::from("Unknown command")).trim().to_string());
             }
         }
     }
@@ -403,7 +405,7 @@ struct Config {
 #[derive(Debug, Deserialize)]
 struct History {
     created: String,
-    created_by: String,
+    created_by: Option<String>,
     empty_layer: Option<bool>,
 }
 
