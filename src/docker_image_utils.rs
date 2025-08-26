@@ -365,11 +365,11 @@ pub fn get_layer_commands(
                 if empty {
                     continue;
                 } else {
-                    commands.push(history.created_by.trim().to_string());
+                    commands.push(history.created_by.unwrap_or(String::from("Unknown command")).trim().to_string());
                 }
             }
             None => {
-                commands.push(history.created_by.trim().to_string());
+                commands.push(history.created_by.unwrap_or(String::from("Unknown command")).trim().to_string());
             }
         }
     }
@@ -403,7 +403,7 @@ struct Config {
 #[derive(Debug, Deserialize)]
 struct History {
     created: String,
-    created_by: String,
+    created_by: Option<String>,
     empty_layer: Option<bool>,
 }
 
